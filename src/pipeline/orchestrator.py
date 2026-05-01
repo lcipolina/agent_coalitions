@@ -32,6 +32,7 @@ from src.pipeline.reputation import apply_run_reputations
 from src.pipeline.surveyor import estimate
 from src.pipeline.synthesis import synthesise
 from src.pipeline.validation import validate
+from src.progress import emit
 
 log = logging.getLogger(__name__)
 
@@ -92,27 +93,56 @@ def _upstream_outputs(run_id: str, subtask: dict) -> list[dict]:
 def run_pipeline(prompt: str) -> dict[str, Any]:
     run_id = _ensure_run(prompt)
     log.info("pipeline run_id=%s prompt=%r", run_id, prompt)
+    emit("pipeline_start", {"prompt": prompt, "run_id": run_id})
 
     # Stage 2: decompose.
+    emit("stage_start", {"stage": "decompose"})
     subtasks = decompose(run_id, prompt)
     ordered = _topo_order(subtasks)
+    emit("decomposed", {
+        "n_subtasks": len(ordered),
+        "subtasks": [
+            {"id": st["subtask_id"], "title": st["title"],
+             "deps": st.get("depends_on", [])}
+            for st in ordered
+        ],
+    })
+    emit("stage_end", {"stage": "decompose"})
 
     # Stage 3: execute subtasks (each writes assignment + messages + output).
-    for st in ordered:
+    emit("stage_start", {"stage": "execute"})
+    total = len(ordered)
+    for idx, st in enumerate(ordered, 1):
         st_doc = {**st, "run_id": run_id}
         upstream = _upstream_outputs(run_id, st_doc)
+        emit("subtask_start", {
+            "subtask_id": st["subtask_id"], "title": st["title"],
+            "idx": idx, "total": total,
+        })
         execute_subtask(run_id, st_doc, upstream)
+        emit("subtask_end", {"subtask_id": st["subtask_id"]})
+    emit("stage_end", {"stage": "execute"})
 
     # Stage 4: synthesise design spec.
+    emit("stage_start", {"stage": "synthesise"})
     spec = synthesise(run_id, prompt)
+    emit("stage_end", {"stage": "synthesise"})
     # Stage 5: validate.
+    emit("stage_start", {"stage": "validate"})
     validation = validate(run_id, spec)
+    emit("stage_end", {"stage": "validate"})
     # Stage 6: cost.
+    emit("stage_start", {"stage": "estimate"})
     cost = estimate(run_id, spec)
+    emit("stage_end", {"stage": "estimate"})
     # Stage 7: report.
+    emit("stage_start", {"stage": "report"})
     md = build_report(run_id, prompt, spec, validation, cost)
+    emit("stage_end", {"stage": "report"})
     # Stage 8: reputation.
+    emit("stage_start", {"stage": "reputation"})
     n_rep = apply_run_reputations(run_id, validation["overall_status"])
+    emit("stage_end", {"stage": "reputation"})
 
     # Finalise runs row.
     db = get_db()
@@ -133,7 +163,7 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
     log_event(run_id, "run_completed",
               {"validation": validation["overall_status"], "cost": cost["total"]})
 
-    return {
+    summary = {
         "run_id": run_id,
         "subtasks": len(ordered),
         "validation": validation["overall_status"],
@@ -141,6 +171,8 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
         "reputation_updates": n_rep,
         "report_md_chars": len(md),
     }
+    emit("pipeline_end", {"run_id": run_id, "summary": summary})
+    return summary
 
 
 def replay(run_id: str) -> dict[str, Any]:

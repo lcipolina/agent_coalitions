@@ -20,6 +20,7 @@ from src.llm.prompts import render
 from src.agents.marshal import MARSHAL_ID, kickoff, reconcile
 from src.matching import search_skills
 from src.agents.set_cover import cover_skills_with_agents
+from src.progress import emit
 from src.tokens import truncate_to_tokens
 
 
@@ -71,6 +72,9 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict]) ->
     )
 
     candidates = _candidates_for(subtask)
+    emit("candidates_found", {
+        "subtask_id": subtask["subtask_id"], "n": len(candidates),
+    })
     coalition, rationale = form_coalition(candidates)
     coalition_skill_ids = [c.skill_id for c in coalition]
     agents = cover_skills_with_agents(coalition_skill_ids, max_agents=3)
@@ -86,6 +90,16 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict]) ->
             "score": float(c.solo),
             "skills_contributed": contributed,
         })
+
+    emit("coalition_formed", {
+        "subtask_id": subtask["subtask_id"],
+        "skills": [
+            {"skill_id": c.skill_id, "name": c.name, "solo": float(c.solo)}
+            for c in coalition
+        ],
+        "agents": contribution_scores,
+        "rationale": rationale,
+    })
 
     # Persist assignment.
     insert_with_event(
@@ -107,6 +121,8 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict]) ->
 
     # Round 0: marshal kickoff.
     kickoff_text = kickoff(run_id, subtask, coalition_agent_ids, upstream_outputs)
+    emit("round_posted", {"subtask_id": subtask["subtask_id"],
+                          "round": 0, "sender": MARSHAL_ID})
 
     # Round 1: agents contribute (mock = "in parallel"; serial calls but no
     # cross-visibility — each agent only sees kickoff + upstream summaries).
@@ -127,9 +143,13 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict]) ->
             role="agent", agent_id=aid, subtask_id=subtask["subtask_id"],
         )
         post(run_id, subtask["subtask_id"], aid, "agent", 1, text)
+        emit("round_posted", {"subtask_id": subtask["subtask_id"],
+                              "round": 1, "sender": aid})
 
     # Round 2: marshal reconcile → subtask_outputs.
     reconciled = reconcile(run_id, subtask)
+    emit("round_posted", {"subtask_id": subtask["subtask_id"],
+                          "round": 2, "sender": MARSHAL_ID})
     summary = truncate_to_tokens(reconciled, 200)
 
     structured: dict[str, Any] = {}

@@ -56,17 +56,83 @@ cp .env.example .env
 
 ## Running
 
-> **Mock mode is the default.** It uses no API calls and runs end-to-end deterministically. Always works.
+> **Mock mode is the default.** It uses no API calls and a full pipeline run
+> finishes in under 5 seconds. This is what we use for the live demo.
+
+### Live demo (Streamlit UI)
 
 ```bash
-# CLI (will exist after gate G6):
-python -m src.run --prompt "design a 2 km bridge for 50 cars/h"
-
-# Streamlit UI (will exist after gate G8):
-streamlit run src/ui/app.py
+conda activate coalitions
+streamlit run app.py
 ```
 
-To use real OpenAI calls, set `USE_MOCK_LLM=false` in `.env`.
+Then, in the browser:
+
+1. Click **🚀 Run pipeline** (the default prompt is pre-filled).
+2. Watch the live progress panel: stage progress bar, per-subtask
+   skills picked from vector search, agents assigned by greedy
+   set-cover with their solo scores, and who paired with whom.
+3. When the run finishes, the 8 result tabs populate from MongoDB:
+   **DAG**, **Coalitions**, **Blackboard**, **Validation**, **Cost**,
+   **Bridge** (elevation plot), **Report**, **Reputation**.
+4. Click **🔁 Replay current** to re-read the run from MongoDB only
+   (zero LLM calls, asserted by the orchestrator).
+5. The sidebar shows the 10 most recent runs — click any to switch.
+
+### CLI
+
+```bash
+python -m src.run --prompt "design a 2 km bridge for 50 cars/h"
+python -m src.run --replay <run_id>
+```
+
+### Tests
+
+```bash
+pytest tests/ -v
+```
+
+### Real LLM mode (used for the demo video, not the live run)
+
+Set `USE_MOCK_LLM=false` in `.env`. The same code path applies; the
+only difference is `src.llm.openai_client` routes to OpenAI (or to
+OpenRouter if `OPENAI_BASE_URL` is set). Embeddings always go to
+OpenAI proper via `OPENAI_EMBEDDING_API_KEY`.
+
+---
+
+## Repository layout
+
+```
+app.py                       # Streamlit UI (run with: streamlit run app.py)
+cost_model.json              # EUR unit costs for the surveyor
+src/
+  config.py                  # pydantic-settings; reads .env
+  matching.py                # Atlas $vectorSearch + cosine fallback
+  tokens.py                  # tiktoken count + truncate (200-tok cap)
+  progress.py                # progress event bus for live UI
+  run.py                     # CLI entrypoint
+  llm/
+    mock.py                  # deterministic embeddings + role-keyed chat
+    openai_client.py         # real-mode wrapper; routes by USE_MOCK_LLM
+    prompts.py               # Jinja2 template loader (render(name, **ctx))
+  prompts/                   # *.j2 templates — one per LLM role
+  db/
+    client.py, indexes.py, writes.py, seed.py
+  agents/
+    coalitions.py            # rank-1 Shapley greedy coalition formation
+    set_cover.py             # weighted greedy skill→agent set cover
+    blackboard.py            # post / read coalition_messages
+    marshal.py               # round 0 kickoff + round 2 reconcile
+  pipeline/
+    decomposer.py, execution.py, synthesis.py, validation.py,
+    surveyor.py, reporter.py, reputation.py, orchestrator.py
+  scripts/
+    ingest_skills.py, ping_mongo.py, test_vector_search.py
+tests/
+  test_matching.py, test_coalitions.py, test_validation.py,
+  test_e2e_mock.py           # full pipeline + replay invariants
+```
 
 ---
 
@@ -76,16 +142,16 @@ The project is built gate-by-gate per `PLAN.md`. Each gate corresponds to one gi
 
 | Gate | What | Status |
 |---|---|---|
-| G1 | Conda env reproducible | in progress |
-| G2 | Config + secrets wiring | pending |
-| G3 | Mongo connectivity | pending |
-| G4 | Skills ingested | pending |
-| G5 | Vector search live | pending |
-| G6 | Mock pipeline end-to-end | pending |
-| G7 | Real-LLM pipeline end-to-end | pending |
-| G8 | Streamlit renders | pending |
-| G9 | Replay works | pending |
-| G10 | Reputation persists | pending |
-| G11 | Demo script passes | pending |
+| G1 | Conda env reproducible | ✅ done |
+| G2 | Config + secrets wiring | ✅ done |
+| G3 | Mongo connectivity (13 collections + vector index) | ✅ done |
+| G4 | Skills ingested (36 skills, 21 agents) | ✅ done |
+| G5 | Atlas Vector Search live | ✅ done |
+| G6 | Mock pipeline end-to-end (12/12 tests green) | ✅ done |
+| G7 | Real-LLM pipeline end-to-end | deferred (used for demo video) |
+| G8 | Streamlit UI with live progress + 8 tabs + bridge viz | ✅ done |
+| G9 | Replay works (zero LLM calls asserted) | ✅ done |
+| G10 | Reputation persists across runs | ✅ done |
+| G11 | Demo script passes (≤90s) | pending |
 
 ---
