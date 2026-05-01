@@ -1,0 +1,362 @@
+[
+  {
+    "skill_id": "structural-load-estimation",
+    "name": "Structural Load Estimation",
+    "description": "Estimate dead, live, dynamic, wind, and seismic loads on civil structures per HL-93 / Eurocode.",
+    "category": "engineering",
+    "tags": ["civil", "loads", "kN", "HL-93", "eurocode"],
+    "weekly_installs": 12500,
+    "github_stars": 88,
+    "repo_url": "https://github.com/example/structural-load-estimation"
+  },
+  {
+    "skill_id": "structural-steel-design",
+    "name": "Structural Steel Design",
+    "description": "Size steel members (I-beams, trusses, plate girders) for bending, shear, buckling and fatigue.",
+    "category": "engineering",
+    "tags": ["steel", "girder", "truss", "AISC"],
+    "weekly_installs": 9800,
+    "github_stars": 122,
+    "repo_url": "https://github.com/example/structural-steel-design"
+  },
+  {
+    "skill_id": "concrete-design",
+    "name": "Reinforced Concrete Design",
+    "description": "Design reinforced and pre-stressed concrete members, decks, piers and abutments.",
+    "category": "engineering",
+    "tags": ["concrete", "rebar", "prestress"],
+    "weekly_installs": 8400,
+    "github_stars": 71,
+    "repo_url": "https://github.com/example/concrete-design"
+  },
+  {
+    "skill_id": "cable-stayed-bridge-systems",
+    "name": "Cable-Stayed Bridge Systems",
+    "description": "Layout pylons, cables and deck for cable-stayed crossings; cable tensioning sequences.",
+    "category": "engineering",
+    "tags": ["cable-stayed", "pylon", "long-span"],
+    "weekly_installs": 1900,
+    "github_stars": 44,
+    "repo_url": "https://github.com/example/cable-stayed-bridge-systems"
+  },
+  {
+    "skill_id": "truss-bridge-systems",
+    "name": "Truss Bridge Systems",
+    "description": "Warren / Pratt / K-truss configurations; member sizing, connection design and span tables.",
+    "category": "engineering",
+    "tags": ["truss", "warren", "pratt"],
+    "weekly_installs": 3300,
+    "github_stars": 51,
+    "repo_url": "https://github.com/example/truss-bridge-systems"
+  },
+  {
+    "skill_id": "arch-bridge-systems",
+    "name": "Arch Bridge Systems",
+    "description": "Tied-arch and through-arch geometry, thrust line and rise-to-span ratio analysis.",
+    "category": "engineering",
+    "tags": ["arch", "thrust-line"],
+    "weekly_installs": 1100,
+    "github_stars": 22,
+    "repo_url": "https://github.com/example/arch-bridge-systems"
+  },
+  {
+    "skill_id": "bridge-deck-design",
+    "name": "Bridge Deck Design",
+    "description": "Composite and orthotropic decks, slab thickness, lane width, drainage and wearing course.",
+    "category": "engineering",
+    "tags": ["deck", "composite", "lanes"],
+    "weekly_installs": 4200,
+    "github_stars": 33,
+    "repo_url": "https://github.com/example/bridge-deck-design"
+  },
+  {
+    "skill_id": "foundation-and-piers",
+    "name": "Foundations and Piers",
+    "description": "Pier sizing, pile groups, abutment design; bearing capacity and scour considerations.",
+    "category": "engineering",
+    "tags": ["foundation", "pier", "abutment", "scour"],
+    "weekly_installs": 5100,
+    "github_stars": 47,
+    "repo_url": "https://github.com/example/foundation-and-piers"
+  },
+  {
+    "skill_id": "geotechnical-site-analysis",
+    "name": "Geotechnical Site Analysis",
+    "description": "Subsurface investigation interpretation; soil bearing, settlement, slope stability for bridge sites.",
+    "category": "engineering",
+    "tags": ["geotech", "soil", "boreholes"],
+    "weekly_installs": 4700,
+    "github_stars": 29,
+    "repo_url": "https://github.com/example/geotechnical-site-analysis"
+  },
+  {
+    "skill_id": "wind-and-aero-elastic-analysis",
+    "name": "Wind and Aero-Elastic Analysis",
+    "description": "Static wind load, vortex shedding, flutter limits for long-span decks and pylons.",
+    "category": "analysis",
+    "tags": ["wind", "flutter", "aero-elastic"],
+    "weekly_installs": 1300,
+    "github_stars": 40,
+    "repo_url": "https://github.com/example/wind-and-aero-elastic-analysis"
+  },
+  {
+    "skill_id": "seismic-analysis",
+    "name": "Seismic Analysis",
+    "description": "Response-spectrum and pushover analysis for bridges; ductility detailing, isolation bearings.",
+    "category": "analysis",
+    "tags": ["seismic", "earthquake", "isolation"],
+    "weekly_installs": 2800,
+    "github_stars": 37,
+    "repo_url": "https://github.com/example/seismic-analysis"
+  },
+  {
+    "skill_id": "fatigue-and-durability",
+    "name": "Fatigue and Durability",
+    "description": "S-N curve fatigue checks, weld category classification, corrosion protection and 50yr durability.",
+    "category": "analysis",
+    "tags": ["fatigue", "durability", "corrosion"],
+    "weekly_installs": 1700,
+    "github_stars": 18,
+    "repo_url": "https://github.com/example/fatigue-and-durability"
+  },
+  {
+    "skill_id": "numerical-validation",
+    "name": "Numerical Validation",
+    "description": "Sanity-check engineering arithmetic: span-to-depth, lane geometry, load arithmetic, unit consistency.",
+    "category": "analysis",
+    "tags": ["validation", "sanity", "units"],
+    "weekly_installs": 6900,
+    "github_stars": 64,
+    "repo_url": "https://github.com/example/numerical-validation"
+  },
+  {
+    "skill_id": "fea-modelling",
+    "name": "FEA Modelling Guidance",
+    "description": "Recommend mesh, element types and boundary conditions for global bridge finite-element models.",
+    "category": "analysis",
+    "tags": ["fea", "mesh", "boundary"],
+    "weekly_installs": 3200,
+    "github_stars": 56,
+    "repo_url": "https://github.com/example/fea-modelling"
+  },
+  {
+    "skill_id": "constructability-review",
+    "name": "Constructability Review",
+    "description": "Erection sequencing, falsework strategy, segmental vs. cast-in-place, site logistics.",
+    "category": "engineering",
+    "tags": ["construction", "erection", "segmental"],
+    "weekly_installs": 2600,
+    "github_stars": 31,
+    "repo_url": "https://github.com/example/constructability-review"
+  },
+  {
+    "skill_id": "materials-science",
+    "name": "Materials Science for Civil Structures",
+    "description": "Compare structural steel grades, weathering steel, HPC, UHPC, timber composites for durability and cost.",
+    "category": "engineering",
+    "tags": ["materials", "weathering-steel", "UHPC"],
+    "weekly_installs": 5800,
+    "github_stars": 43,
+    "repo_url": "https://github.com/example/materials-science"
+  },
+  {
+    "skill_id": "cost-analysis",
+    "name": "Cost Analysis",
+    "description": "Quantity take-off, unit-cost build-up, contingencies and lifecycle cost reasoning.",
+    "category": "analysis",
+    "tags": ["cost", "qto", "lifecycle"],
+    "weekly_installs": 7300,
+    "github_stars": 39,
+    "repo_url": "https://github.com/example/cost-analysis"
+  },
+  {
+    "skill_id": "quantity-takeoff",
+    "name": "Quantity Take-Off",
+    "description": "Compute structural-steel tonnage, concrete volume, deck area from a conceptual design spec.",
+    "category": "analysis",
+    "tags": ["qto", "tonnage", "volume"],
+    "weekly_installs": 4400,
+    "github_stars": 21,
+    "repo_url": "https://github.com/example/quantity-takeoff"
+  },
+  {
+    "skill_id": "lifecycle-and-maintenance",
+    "name": "Lifecycle and Maintenance Planning",
+    "description": "Inspection regimes, repaint cycles, deck-replacement intervals, NPV of maintenance.",
+    "category": "analysis",
+    "tags": ["lifecycle", "maintenance", "NPV"],
+    "weekly_installs": 1500,
+    "github_stars": 14,
+    "repo_url": "https://github.com/example/lifecycle-and-maintenance"
+  },
+  {
+    "skill_id": "traffic-and-load-modelling",
+    "name": "Traffic and Load Modelling",
+    "description": "Translate traffic counts (cars/h, truck %) into design live load per metre and lane factors.",
+    "category": "analysis",
+    "tags": ["traffic", "lanes", "live-load"],
+    "weekly_installs": 3700,
+    "github_stars": 25,
+    "repo_url": "https://github.com/example/traffic-and-load-modelling"
+  },
+  {
+    "skill_id": "hydrology-and-river-engineering",
+    "name": "Hydrology and River Engineering",
+    "description": "Estimate design flood, scour depth, freeboard and span clearance over rivers.",
+    "category": "engineering",
+    "tags": ["hydrology", "scour", "river"],
+    "weekly_installs": 1900,
+    "github_stars": 12,
+    "repo_url": "https://github.com/example/hydrology-and-river-engineering"
+  },
+  {
+    "skill_id": "site-and-geometry-planning",
+    "name": "Site and Geometry Planning",
+    "description": "Choose bank locations, alignment, span layout and approach grade for a crossing.",
+    "category": "engineering",
+    "tags": ["site", "alignment", "spans"],
+    "weekly_installs": 2200,
+    "github_stars": 19,
+    "repo_url": "https://github.com/example/site-and-geometry-planning"
+  },
+  {
+    "skill_id": "architectural-aesthetics",
+    "name": "Architectural Aesthetics",
+    "description": "Bridge form, proportion, pylon shape, lighting and contextual harmony with the surrounding landscape.",
+    "category": "design",
+    "tags": ["aesthetic", "form", "proportion"],
+    "weekly_installs": 4100,
+    "github_stars": 58,
+    "repo_url": "https://github.com/example/architectural-aesthetics"
+  },
+  {
+    "skill_id": "elevation-rendering",
+    "name": "Elevation Rendering",
+    "description": "Draw schematic elevation views with span lines, pylons, deck profile and supports.",
+    "category": "design",
+    "tags": ["render", "elevation", "svg"],
+    "weekly_installs": 3500,
+    "github_stars": 30,
+    "repo_url": "https://github.com/example/elevation-rendering"
+  },
+  {
+    "skill_id": "schematic-diagramming",
+    "name": "Schematic Diagramming",
+    "description": "Produce clean engineering schematics with annotations, force arrows and cross-sections.",
+    "category": "design",
+    "tags": ["schematic", "diagram", "plotly"],
+    "weekly_installs": 4900,
+    "github_stars": 42,
+    "repo_url": "https://github.com/example/schematic-diagramming"
+  },
+  {
+    "skill_id": "color-palette-design",
+    "name": "Color Palette Design",
+    "description": "Pick palettes for engineering visuals: neutral background, accent for primary structure, warning for fail.",
+    "category": "design",
+    "tags": ["palette", "ui", "viz"],
+    "weekly_installs": 2700,
+    "github_stars": 24,
+    "repo_url": "https://github.com/example/color-palette-design"
+  },
+  {
+    "skill_id": "lighting-design",
+    "name": "Bridge Lighting Design",
+    "description": "Functional and architectural illumination for decks, pylons and pedestrian walkways.",
+    "category": "design",
+    "tags": ["lighting", "led"],
+    "weekly_installs": 900,
+    "github_stars": 9,
+    "repo_url": "https://github.com/example/lighting-design"
+  },
+  {
+    "skill_id": "pedestrian-and-cyclist-integration",
+    "name": "Pedestrian and Cyclist Integration",
+    "description": "Walkway widths, separation barriers, ramps and accessibility for non-motorised users.",
+    "category": "design",
+    "tags": ["pedestrian", "cyclist", "accessibility"],
+    "weekly_installs": 1600,
+    "github_stars": 11,
+    "repo_url": "https://github.com/example/pedestrian-and-cyclist-integration"
+  },
+  {
+    "skill_id": "environmental-impact-assessment",
+    "name": "Environmental Impact Assessment",
+    "description": "Identify ecological constraints, embodied-carbon estimate, mitigation measures for bridge schemes.",
+    "category": "analysis",
+    "tags": ["environment", "carbon", "EIA"],
+    "weekly_installs": 2300,
+    "github_stars": 26,
+    "repo_url": "https://github.com/example/environmental-impact-assessment"
+  },
+  {
+    "skill_id": "embodied-carbon-estimation",
+    "name": "Embodied Carbon Estimation",
+    "description": "Compute kgCO2e per tonne / m3 for steel, concrete, timber; rank options by carbon footprint.",
+    "category": "analysis",
+    "tags": ["carbon", "sustainability", "LCA"],
+    "weekly_installs": 1200,
+    "github_stars": 17,
+    "repo_url": "https://github.com/example/embodied-carbon-estimation"
+  },
+  {
+    "skill_id": "code-compliance-eurocode",
+    "name": "Eurocode Compliance",
+    "description": "Cite relevant Eurocode clauses for bridge actions, ULS/SLS combinations and detailing.",
+    "category": "engineering",
+    "tags": ["eurocode", "ULS", "SLS"],
+    "weekly_installs": 3900,
+    "github_stars": 34,
+    "repo_url": "https://github.com/example/code-compliance-eurocode"
+  },
+  {
+    "skill_id": "code-compliance-aashto",
+    "name": "AASHTO Compliance",
+    "description": "Cite AASHTO LRFD clauses for highway bridge design, HL-93 live load and load combinations.",
+    "category": "engineering",
+    "tags": ["aashto", "LRFD", "HL-93"],
+    "weekly_installs": 3100,
+    "github_stars": 27,
+    "repo_url": "https://github.com/example/code-compliance-aashto"
+  },
+  {
+    "skill_id": "technical-writing",
+    "name": "Technical Writing",
+    "description": "Concise engineering prose for design briefs, basis of design, and conceptual proposals.",
+    "category": "writing",
+    "tags": ["writing", "report"],
+    "weekly_installs": 6200,
+    "github_stars": 53,
+    "repo_url": "https://github.com/example/technical-writing"
+  },
+  {
+    "skill_id": "executive-summary-drafting",
+    "name": "Executive Summary Drafting",
+    "description": "Distil a multi-discipline conceptual design into a 1-page client-ready summary.",
+    "category": "writing",
+    "tags": ["summary", "report", "client"],
+    "weekly_installs": 2900,
+    "github_stars": 21,
+    "repo_url": "https://github.com/example/executive-summary-drafting"
+  },
+  {
+    "skill_id": "risk-register-authoring",
+    "name": "Risk Register Authoring",
+    "description": "Identify, score and propose mitigations for technical, schedule and cost risks on bridge projects.",
+    "category": "writing",
+    "tags": ["risk", "register"],
+    "weekly_installs": 1400,
+    "github_stars": 10,
+    "repo_url": "https://github.com/example/risk-register-authoring"
+  },
+  {
+    "skill_id": "applied-mathematics",
+    "name": "Applied Mathematics for Engineers",
+    "description": "Beam theory, matrix structural analysis, optimisation and statistics for civil engineering problems.",
+    "category": "math",
+    "tags": ["math", "beam-theory", "optimisation"],
+    "weekly_installs": 5500,
+    "github_stars": 49,
+    "repo_url": "https://github.com/example/applied-mathematics"
+  }
+]

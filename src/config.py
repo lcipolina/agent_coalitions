@@ -23,8 +23,11 @@ class Settings(BaseSettings):
     mongodb_uri: str = Field(..., alias="MONGODB_URI")
     mongodb_db: str = Field("agent_coalitions", alias="MONGODB_DB")
 
-    # OpenAI
+    # OpenAI (chat may be routed through OpenRouter via OPENAI_BASE_URL +
+    # OPENAI_API_KEY=sk-or-...; embeddings still require OpenAI proper).
     openai_api_key: str = Field("", alias="OPENAI_API_KEY")
+    openai_base_url: str | None = Field(None, alias="OPENAI_BASE_URL")
+    openai_embedding_api_key: str | None = Field(None, alias="OPENAI_EMBEDDING_API_KEY")
     openai_embedding_model: str = Field(
         "text-embedding-3-small", alias="OPENAI_EMBEDDING_MODEL"
     )
