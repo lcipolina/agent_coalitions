@@ -24,14 +24,14 @@ from typing import Any
 from src.config import settings
 from src.db.client import get_db
 from src.db.writes import insert_with_event, log_event
-from src.decomposer import decompose
-from src.execution import execute_subtask
+from src.pipeline.decomposer import decompose
+from src.pipeline.execution import execute_subtask
 from src.llm import openai_client
-from src.reporter import build_report
-from src.reputation import apply_run_reputations
-from src.surveyor import estimate
-from src.synthesis import synthesise
-from src.validation import validate
+from src.pipeline.reporter import build_report
+from src.pipeline.reputation import apply_run_reputations
+from src.pipeline.surveyor import estimate
+from src.pipeline.synthesis import synthesise
+from src.pipeline.validation import validate
 
 log = logging.getLogger(__name__)
 

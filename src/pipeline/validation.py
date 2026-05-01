@@ -16,6 +16,7 @@ from typing import Any
 from src.db.client import get_db
 from src.db.writes import insert_with_event
 from src.llm.openai_client import chat
+from src.llm.prompts import render
 
 log = logging.getLogger(__name__)
 
@@ -113,8 +114,7 @@ def validate(run_id: str, spec: dict) -> dict:
     outputs = list(db.subtask_outputs.find({"run_id": run_id}, {"_id": 0}))
     for o in outputs:
         raw = chat(
-            f"Score this subtask summary on clarity, completeness, consistency (0-10):\n"
-            f"{o['summary']}",
+            render("judge", subtask_id=o["subtask_id"], summary=o["summary"]),
             role="judge", subtask_id=o["subtask_id"],
         )
         try:

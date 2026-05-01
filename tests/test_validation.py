@@ -1,5 +1,5 @@
 """Tests for deterministic validator checks."""
-from src.validation import (
+from src.pipeline.validation import (
     _check_lane_geometry, _check_live_load, _check_material_span,
     _check_span_to_depth, _check_support_count, _overall,
 )

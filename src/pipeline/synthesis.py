@@ -8,6 +8,7 @@ from typing import Any
 from src.db.client import get_db
 from src.db.writes import insert_with_event
 from src.llm.openai_client import chat
+from src.llm.prompts import render
 
 log = logging.getLogger(__name__)
 
@@ -29,10 +30,8 @@ def synthesise(run_id: str, prompt: str) -> dict:
     outputs = list(
         db.subtask_outputs.find({"run_id": run_id}, {"_id": 0}).sort("subtask_id", 1)
     )
-    summaries_text = "\n".join(f"- {o['subtask_id']}: {o['summary']}" for o in outputs)
     raw = chat(
-        f"User prompt: {prompt}\n\nSubtask summaries:\n{summaries_text}\n\n"
-        f"Synthesise a final design_specs JSON.",
+        render("synthesizer", prompt=prompt, outputs=outputs),
         role="synthesizer",
     )
     try:

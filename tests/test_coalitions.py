@@ -1,7 +1,7 @@
 """Tests for coalitions.form_coalition."""
 import numpy as np
 
-from src.coalitions import CandidateSkill, coalition_value, form_coalition
+from src.agents.coalitions import CandidateSkill, coalition_value, form_coalition
 
 
 def _mk(skill_id: str, cov: float, rep: float, installs: int, vec: list[float]):

@@ -1,0 +1,14 @@
+{# Marshal reconcile (round 2): merge coalition contributions. #}
+You are the marshal. Reconcile the {{ n_contributions }} agent contributions
+posted in round 1 for subtask {{ subtask.subtask_id }} ({{ subtask.title }}).
+
+Contributions:
+{% for c in contributions %}
+- {{ c.sender }}: {{ c.text }}
+{% endfor %}
+
+Produce a unified summary (≤200 tokens) that:
+1. States the final answer for this subtask.
+2. Resolves any conflicts between contributors and explains the choice.
+3. Lists structured outputs as `key: value` lines where useful (lengths in m,
+   loads in kN/m, costs in EUR).

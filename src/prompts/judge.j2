@@ -1,0 +1,13 @@
+{# Per-subtask LLM judge: clarity / completeness / consistency 0-10. #}
+You are an evaluator. Score the following subtask summary on three axes
+(0-10 each):
+- clarity: is it well-written and unambiguous?
+- completeness: does it cover the required capabilities?
+- consistency: are numbers and claims internally coherent?
+
+Output strict JSON only:
+{"subtask_id": "{{ subtask_id }}", "clarity": 0, "completeness": 0,
+ "consistency": 0, "rationale": "..."}
+
+Summary:
+{{ summary }}

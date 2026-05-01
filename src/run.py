@@ -11,7 +11,7 @@ import json
 import logging
 import sys
 
-from src.orchestrator import replay, run_pipeline
+from src.pipeline.orchestrator import replay, run_pipeline
 
 
 def main(argv: list[str] | None = None) -> int:

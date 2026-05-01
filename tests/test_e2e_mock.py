@@ -12,7 +12,7 @@ import os
 
 from src.config import settings
 from src.db.client import get_db
-from src.orchestrator import replay, run_pipeline
+from src.pipeline.orchestrator import replay, run_pipeline
 from src.tokens import count_tokens
 
 REQUIRED_EVENT_KINDS = {

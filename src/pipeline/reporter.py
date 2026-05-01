@@ -4,6 +4,7 @@ from __future__ import annotations
 from src.db.client import get_db
 from src.db.writes import insert_with_event
 from src.llm.openai_client import chat
+from src.llm.prompts import render
 
 DISCLAIMER = (
     "*Conceptual design produced by an experimental multi-agent system. "
@@ -13,11 +14,7 @@ DISCLAIMER = (
 
 def build_report(run_id: str, prompt: str, spec: dict, validation: dict, cost: dict) -> str:
     body = chat(
-        f"User prompt: {prompt}\n"
-        f"Bridge type: {spec.get('bridge_type')}\n"
-        f"Validation: {validation['overall_status']}\n"
-        f"Total cost: {cost['total']} {cost['currency']}\n"
-        f"Write a concise markdown executive summary.",
+        render("reporter", prompt=prompt, spec=spec, validation=validation, cost=cost),
         role="reporter",
     )
     md = (

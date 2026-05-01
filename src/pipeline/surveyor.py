@@ -6,8 +6,9 @@ from pathlib import Path
 
 from src.db.writes import insert_with_event
 from src.llm.openai_client import chat
+from src.llm.prompts import render
 
-COST_MODEL_PATH = Path(__file__).resolve().parents[1] / "cost_model.json"
+COST_MODEL_PATH = Path(__file__).resolve().parents[2] / "cost_model.json"
 
 
 def _load_cost_model() -> dict:
@@ -67,8 +68,15 @@ def estimate(run_id: str, spec: dict) -> dict:
     total = int(subtotal + finishing + contingency)
 
     narrative = chat(
-        f"Subtotal {subtotal} {cm['currency']}; primary "
-        f"{spec.get('primary_material')}; total {total} {cm['currency']}.",
+        render(
+            "surveyor_narrative",
+            subtotal=int(subtotal),
+            currency=cm["currency"],
+            finishing_pct=cm["finishing_premium_pct"],
+            contingency_pct=cm["contingency_pct"],
+            total=total,
+            primary_material=spec.get("primary_material", ""),
+        ),
         role="surveyor_narrative",
     )
 

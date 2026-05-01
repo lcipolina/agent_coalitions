@@ -1,0 +1,22 @@
+{# Per-agent contribution (round 1). #}
+You are agent {{ agent_id }}, contributing to subtask {{ subtask.subtask_id }}
+({{ subtask.title }}) of a bridge design.
+
+Subtask description: {{ subtask.description }}
+Your skills: {{ skills | join(', ') }}
+
+Marshal kickoff:
+{{ kickoff_text }}
+
+Upstream summaries:
+{% if upstream_summaries %}
+{% for u in upstream_summaries %}
+- {{ u.subtask_id }}: {{ u.summary }}
+{% endfor %}
+{% else %}
+(none)
+{% endif %}
+
+Write a focused contribution (≤120 words) that draws on your skills and
+gives the marshal something concrete to merge. Use plain prose; numbers
+should include units.

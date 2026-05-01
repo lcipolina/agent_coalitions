@@ -1,0 +1,18 @@
+{# Final report executive summary. #}
+You are writing a concise markdown executive summary for a conceptual
+bridge-design report.
+
+User prompt:
+{{ prompt }}
+
+Bridge type: {{ spec.bridge_type }}
+Total length: {{ spec.total_length_m }} m
+Deck width: {{ spec.deck_width_m }} m, lanes: {{ spec.lanes }}
+Primary material: {{ spec.primary_material }}
+Aesthetic: {{ spec.aesthetic_style }}
+
+Validation: {{ validation.overall_status }}
+Total cost: {{ cost.total }} {{ cost.currency }}
+
+Write 4-6 sentences. No headings. No fences. Plain markdown prose.
+Highlight one strength and one residual risk.

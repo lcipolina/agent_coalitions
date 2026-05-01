@@ -12,18 +12,9 @@ from typing import Any
 
 from src.db.writes import insert_with_event
 from src.llm.openai_client import chat
+from src.llm.prompts import render
 
 log = logging.getLogger(__name__)
-
-DEFAULT_DAG_PROMPT_HEADER = """You decompose a user design prompt into 5-8 subtasks.
-
-Rules:
-- Output strict JSON: {"subtasks":[{"subtask_id":"T1","title":"...","description":"...","required_capabilities":["..."],"depends_on":[]}]}
-- DAG must be acyclic; depends_on may only reference earlier subtask_ids.
-- Include subtasks for validation, budget, visualization and final report when applicable.
-
-User prompt:
-"""
 
 
 # Fallback DAG used when (a) we are in mock mode, or (b) the LLM JSON parse
@@ -78,7 +69,7 @@ def _validate_dag(subtasks: list[dict[str, Any]]) -> bool:
 
 def decompose(run_id: str, prompt: str) -> list[dict[str, Any]]:
     try:
-        raw = chat(DEFAULT_DAG_PROMPT_HEADER + prompt, role="decomposer")
+        raw = chat(render("decomposer", prompt=prompt), role="decomposer")
         data = json.loads(raw)
         subtasks = data["subtasks"]
         if not _validate_dag(subtasks):

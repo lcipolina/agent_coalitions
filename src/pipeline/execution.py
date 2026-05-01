@@ -11,14 +11,15 @@ from typing import Any
 
 import numpy as np
 
-from src.blackboard import post
-from src.coalitions import CandidateSkill, form_coalition
+from src.agents.blackboard import post
+from src.agents.coalitions import CandidateSkill, form_coalition
 from src.db.client import get_db
 from src.db.writes import insert_with_event, log_event
 from src.llm.openai_client import chat, embed
-from src.marshal import MARSHAL_ID, kickoff, reconcile
+from src.llm.prompts import render
+from src.agents.marshal import MARSHAL_ID, kickoff, reconcile
 from src.matching import search_skills
-from src.set_cover import cover_skills_with_agents
+from src.agents.set_cover import cover_skills_with_agents
 from src.tokens import truncate_to_tokens
 
 
@@ -105,15 +106,24 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict]) ->
     )
 
     # Round 0: marshal kickoff.
-    kickoff(run_id, subtask, coalition_agent_ids, upstream_outputs)
+    kickoff_text = kickoff(run_id, subtask, coalition_agent_ids, upstream_outputs)
 
     # Round 1: agents contribute (mock = "in parallel"; serial calls but no
     # cross-visibility — each agent only sees kickoff + upstream summaries).
+    agent_skills_by_id = {a["agent_id"]: a.get("skill_ids", []) for a in agents}
     for aid in coalition_agent_ids:
         if aid == MARSHAL_ID:
             continue
+        agent_prompt = render(
+            "agent",
+            agent_id=aid,
+            subtask=subtask,
+            skills=agent_skills_by_id.get(aid, []),
+            kickoff_text=kickoff_text,
+            upstream_summaries=upstream_outputs,
+        )
         text = chat(
-            f"Subtask {subtask['subtask_id']}: contribute as {aid}.",
+            agent_prompt,
             role="agent", agent_id=aid, subtask_id=subtask["subtask_id"],
         )
         post(run_id, subtask["subtask_id"], aid, "agent", 1, text)

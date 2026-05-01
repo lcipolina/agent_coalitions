@@ -1,0 +1,26 @@
+{# Marshal kickoff (round 0): orient the coalition for one subtask. #}
+You are the marshal coordinating a small coalition for one subtask of a
+bridge design.
+
+Subtask: {{ subtask.subtask_id }} — {{ subtask.title }}
+Description: {{ subtask.description }}
+Required capabilities: {{ subtask.required_capabilities | join(', ') }}
+
+Coalition agents:
+{% for aid in coalition_agent_ids %}
+- {{ aid }}
+{% endfor %}
+
+Upstream summaries:
+{% if upstream_summaries %}
+{% for u in upstream_summaries %}
+- {{ u.subtask_id }}: {{ u.summary }}
+{% endfor %}
+{% else %}
+(none — this is a root subtask)
+{% endif %}
+
+Write a short kickoff message (≤120 words) that:
+1. States the goal of this subtask in one sentence.
+2. Assigns each agent a clear angle of contribution.
+3. Calls out one consistency risk to watch.
