@@ -9,5 +9,6 @@ langgraph==0.*
 langchain-core==0.*
 tiktoken==0.*
 pydantic==2.*
+pydantic-settings==2.*
 pytest==8.*
 numpy
