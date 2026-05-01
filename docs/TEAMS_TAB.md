@@ -99,8 +99,8 @@ This is the **second table inside the expander**. It is the team's
 | column                | source                                  | meaning                                                                                                                                                                                                                |
 | --------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `agent`               | `_agent_label(agent_id)`                | Short label of the agent (e.g. `#017`).                                                                                                                                                                                |
-| `shapley`             | `shapley_values()` in `coalitions.py`   | The agent's **exact Shapley value** for this team — the closed-form payoff `φᵢ = aᵢ + ½·Σ wᵢⱼ` for the induced-subgraph game, summed over the skills the agent contributed. By the *efficiency* axiom this column sums to `v(N)`. |
-| `share %`             | `100 · shapley / Σ shapley`             | Same number, normalised to 100 % across the team. Reads as "fraction of this team's joint output fairly attributable to this agent". This is the **standardised / normalised Shapley value** — what people often call the "share of credit". |
+| `shapley`             | `shapley_values()` in `coalitions.py`   | The agent's **exact Shapley value** for this team — the closed-form payoff `φᵢ = aᵢ + ½·Σ wᵢⱼ` for the induced-subgraph game, summed over the skills the agent contributed. Rounded to **2 decimals** for display. By the *efficiency* axiom this column sums to `v(N)`. |
+| `contribution %`      | `100 · shapley / Σ shapley`             | Same number, normalised to 100 % across the team. Reads as "fraction of this team's joint output fairly attributable to this agent". This is the **standardised / normalised Shapley value** — what people often call the *share of credit*. **Not** the same as a *marginal contribution* `v(S∪{i}) − v(S)` (see naming caveat below). |
 | `skills_contributed`  | computed in set-cover                   | Comma-separated list of skill_ids the agent actually covered for this team. May be a strict subset of the agent's full skill list.                                                                                     |
 
 ### What is the "solo value" `aᵢ` and where does it come from?
@@ -141,7 +141,7 @@ either alone, so adding them together earns the team an extra `wᵢⱼ`
 on top of `aᵢ + aⱼ`. The Shapley value splits that bonus fairly: half
 to each endpoint of the edge.
 
-### So what does `share %` actually tell you?
+### So what does `contribution %` actually tell you?
 
 It is the agent's slice of **the team's joint output `v(N)`** —
 solo strengths *plus* the complementarities the agent helps unlock.
@@ -149,10 +149,19 @@ A 33% share in a 3-agent team means "roughly equal contributors"; a
 60/30/10 split means one agent both has a strong solo value *and*
 benefits a lot from complementarities with the other two.
 
-> **Naming.** `share %` and "normalised Shapley value" and "share of
-> credit" are three names for the same number: `φᵢ / Σⱼ φⱼ · 100 %`.
-> The unnormalised `shapley` column is the raw Shapley payoff in the
-> same units as the solo value formula above.
+> **Naming caveat.** `contribution %`, *normalised Shapley value*
+> and *share of credit* are three names for the same number:
+> `φᵢ / Σⱼ φⱼ · 100 %`. The unnormalised `shapley` column is the raw
+> Shapley payoff in the same units as the solo value formula above.
+>
+> ⚠️ This is **not** the same as a *marginal contribution* in the
+> game-theory sense, which is `v(S ∪ {i}) − v(S)` — the value an
+> agent adds when joining a particular coalition `S`. The Shapley
+> value is the *average* of those marginal contributions across all
+> orderings; `contribution %` is that Shapley value rescaled to the
+> team total. We avoid the term "marginal contribution" in the UI
+> precisely because it has a different, narrower meaning in the
+> literature.
 
 ---
 
@@ -174,7 +183,7 @@ deterministic role-keyed router in `src/llm/mock.py`.
 ## 6. The footnote at the bottom of the tab
 
 ```
-**About the `shapley` and `share %` columns.** `shapley` is the
+**About the `shapley` and `contribution %` columns.** `shapley` is the
 exact Shapley value for the induced-subgraph game …
 ```
 
@@ -204,7 +213,7 @@ match your intuition:
    subtasks may share required capabilities. If it feels wrong, the
    fix is in the marshal step, not here.
 
-4. **A 1-agent team has `share % = 100 %` trivially.** The Shapley
+4. **A 1-agent team has `contribution % = 100 %` trivially.** The Shapley
    value of a lone player equals `v({s})` (no orderings to average
    over). That's not a bug — it is what "fair share" means when
    there's one player.

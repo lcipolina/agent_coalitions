@@ -110,7 +110,9 @@ single page so you (or a judge) can read it in 90 seconds.
    │  For each member of S we compute the exact Shapley value              │
    │     φᵢ = aᵢ + ½·Σⱼ≠ᵢ  wᵢⱼ                                              │
    │  and the normalised share φᵢ / Σ φⱼ × 100 %                            │
-   │  → shown in the Teams tab as `shapley` and `share %`.                  │
+   │  → shown in the Teams tab as `shapley` (rounded to 2 dp) and          │
+   │    `contribution %` (a.k.a. normalised Shapley / share of credit;     │
+   │    NOT the same as a marginal contribution v(S∪{i})−v(S)).            │
    └──────────────────────────────┬─────────────────────────────────────────┘
                                   │
                                   ▼

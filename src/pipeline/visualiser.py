@@ -90,14 +90,54 @@ def _bridge_primitives(spec: dict[str, Any]) -> dict[str, Any]:
 
     prims: list[dict[str, Any]] = []
 
+    # Banks (shore strips on each side of the river) — visible reference
+    # so the deck doesn't look like it's floating on infinite water.
+    bank_w = max(L * 0.06, 6.0)
+    for x_a, x_b, name in (
+        (-bank_w, 0.0, "bank_west"),
+        (L, L + bank_w, "bank_east"),
+    ):
+        prims.append(_box(
+            x_a, x_b, -W * 1.6, W * 1.6,
+            -0.05, max(z_deck * 0.05, 0.4),
+            "#9aa089", name,
+        ))
+
     # Deck
     prims.append(_box(0.0, L, -W / 2, W / 2,
                       z_deck, z_deck + deck_t,
                       "#2c2c2c", "deck"))
 
-    # Piers
+    # Parapet / edge beams running the full length on each side of the
+    # deck — a small detail that gives the deck visible depth and stops
+    # the default-girder bridge from looking like a bare slab.
+    parapet_h = max(deck_t * 0.6, 0.6)
+    for ys, y_e, name in (
+        (-W / 2, -W / 2 + max(W * 0.04, 0.3), "parapet_left"),
+        (W / 2 - max(W * 0.04, 0.3), W / 2, "parapet_right"),
+    ):
+        prims.append(_box(
+            0.0, L, ys, y_e,
+            z_deck + deck_t, z_deck + deck_t + parapet_h,
+            "#bfbfbf", name,
+        ))
+
+    # Abutments at each bank — short, wide blocks under the deck ends.
+    abut_x = max(L * 0.02, 2.0)
+    for x_a, x_b, name in (
+        (-abut_x * 0.5, abut_x, "abutment_west"),
+        (L - abut_x, L + abut_x * 0.5, "abutment_east"),
+    ):
+        prims.append(_box(
+            x_a, x_b, -W * 0.55, W * 0.55,
+            0.0, z_deck,
+            "#8a8a8a", name,
+        ))
+
+    # Piers (intermediate supports only — the abutments cover the ends)
     xs = _support_xs(spec) or [0.0, L]
-    for xp in xs:
+    interior_xs = [xp for xp in xs if 0.0 < xp < L]
+    for xp in interior_xs:
         prims.append(_box(
             xp - pier_w / 2, xp + pier_w / 2,
             -W * 0.30, W * 0.30,
@@ -229,7 +269,11 @@ def _bridge_primitives(spec: dict[str, Any]) -> dict[str, Any]:
         "title": (f"{spec.get('bridge_type', 'structure').replace('_', ' ').title()} "
                   f"· {int(L)} m total · longest span {int(longest)} m"),
         "axes": {"x": "length (m)", "y": "width (m)", "z": "height (m)"},
-        "extent": {"x": [0.0, L], "y": [-W, W], "z": [-1.0, z_deck * 5]},
+        "extent": {
+            "x": [-bank_w, L + bank_w],
+            "y": [-W * 1.6, W * 1.6],
+            "z": [-1.0, z_deck * 4],
+        },
     }
     return geometry
 

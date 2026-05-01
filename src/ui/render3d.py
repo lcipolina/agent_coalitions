@@ -70,6 +70,32 @@ def render_geometry(geometry: dict[str, Any]) -> go.Figure:
         # silently ignore unknown kinds — keeps the renderer forward-compatible
 
     axes = geometry.get("axes", {})
+
+    # Bridges (and most civil structures) are very long compared to their
+    # width and height. Plotly's ``aspectmode='data'`` would honour the
+    # true scale and crush the vertical axis to a sliver, making piers,
+    # cables and the deck thickness invisible. We therefore compute a
+    # manual aspect ratio that keeps X dominant but exaggerates Y / Z
+    # enough that the structure is legible. The exaggeration is bounded
+    # so very compact specs (e.g. a tower) still look natural.
+    extent = geometry.get("extent") or {}
+    ex = extent.get("x") or [0.0, 1.0]
+    ey = extent.get("y") or [-0.5, 0.5]
+    ez = extent.get("z") or [0.0, 1.0]
+    sx = max(float(ex[1]) - float(ex[0]), 1e-6)
+    sy = max(float(ey[1]) - float(ey[0]), 1e-6)
+    sz = max(float(ez[1]) - float(ez[0]), 1e-6)
+    # Reference scale = the longest extent. Each axis is shown at
+    # ratio = (its extent / reference) ** 0.5 so a 10× longer X axis
+    # becomes only ~3.16× longer on screen.
+    ref = max(sx, sy, sz)
+    ax_x = max((sx / ref) ** 0.5, 0.25)
+    ax_y = max((sy / ref) ** 0.5, 0.25)
+    ax_z = max((sz / ref) ** 0.5, 0.40)
+    # Re-normalise so the dominant axis is exactly 1.
+    m = max(ax_x, ax_y, ax_z)
+    ax_x, ax_y, ax_z = ax_x / m, ax_y / m, ax_z / m
+
     fig.update_layout(
         title=dict(text=geometry.get("title", ""), x=0.02, y=0.98,
                    font=dict(size=14)),
@@ -80,8 +106,9 @@ def render_geometry(geometry: dict[str, Any]) -> go.Figure:
                        backgroundcolor="#eef2f5", showbackground=True),
             zaxis=dict(title=axes.get("z", "z"),
                        backgroundcolor="#eef2f5", showbackground=True),
-            aspectmode="data",
-            camera=dict(eye=dict(x=1.4, y=-1.6, z=0.85)),
+            aspectmode="manual",
+            aspectratio=dict(x=ax_x, y=ax_y, z=ax_z),
+            camera=dict(eye=dict(x=1.6, y=-1.9, z=1.1)),
         ),
         margin=dict(l=0, r=0, t=40, b=0),
         height=580,

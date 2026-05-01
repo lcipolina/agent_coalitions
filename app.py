@@ -483,18 +483,21 @@ with tab_coal:
                 #     for this subtask. Sums across the table to ``v(N)``,
                 #     the team's total worth — that is the *efficiency*
                 #     axiom of the Shapley value.
-                #   - ``share %``   : the same number normalised to the
-                #     team total, so each row reads as "X % of the credit
-                #     for this team's joint output". This is the most
-                #     intuitive per-agent metric for a non-game-theory
-                #     audience.
+                #   - ``contribution %`` : the same number normalised to
+                #     the team total, so each row reads as "X % of the
+                #     credit for this team's joint output". This is the
+                #     most intuitive per-agent metric for a non-game-
+                #     theory audience. (Equivalent terms in the
+                #     literature: *normalised Shapley value*, *share of
+                #     credit*. NOT the same as *marginal contribution*,
+                #     which is the pre-averaging quantity v(S∪{i}) − v(S).)
                 contribs = a.get("contribution_scores", [])
                 shapley_total = sum(cs.get("shapley", 0.0) for cs in contribs) or 1.0
                 contrib_rows = [
                     {
                         "agent": _agent_label(cs["agent_id"]),
-                        "shapley": round(cs.get("shapley", 0.0), 4),
-                        "share %": round(
+                        "shapley": round(cs.get("shapley", 0.0), 2),
+                        "contribution %": round(
                             100.0 * cs.get("shapley", 0.0) / shapley_total, 1,
                         ),
                         "skills_contributed": ", ".join(
@@ -509,7 +512,7 @@ with tab_coal:
                 st.caption(f"_Rationale:_ {a.get('selection_rationale', '')}")
         st.markdown("---")
         st.caption(
-            "**About the `shapley` and `share %` columns.**  "
+            "**About the `shapley` and `contribution %` columns.**  "
             "`shapley` is the **exact Shapley value** for the induced-subgraph "
             "game (Deng\u2013Papadimitriou 1994 closed form): "
             "`\u03c6\u1d62 = a\u1d62 + \u00bd\u00b7\u03a3 w\u1d62\u2c7c`, "
@@ -518,9 +521,12 @@ with tab_coal:
             "and `w\u1d62\u2c7c = 0.4\u00b7(1 \u2212 cos(e\u1d62, e\u2c7c))` is the pairwise "
             "complementarity to the other team members. By the *efficiency* "
             "axiom, the column sums to `v(N)` \u2014 the total worth of the team. "
-            "`share %` is the same number normalised to that total, i.e. *the "
-            "fraction of the team's joint output fairly attributable to this "
-            "agent*. The greedy team-formation loop uses single marginal "
+            "`contribution %` is the same number normalised to that total, i.e. "
+            "*the fraction of the team's joint output fairly attributable to "
+            "this agent* (a.k.a. *normalised Shapley value* / *share of credit* "
+            "— not to be confused with a *marginal contribution* `v(S∪{i}) − v(S)`, "
+            "which is the un-averaged building block the Shapley value averages over). "
+            "The greedy team-formation loop uses single marginal "
             "contributions to grow the team \u2014 a rank-1 Shapley "
             "approximation \u2014 and the exact Shapley closed form is "
             "computed once on the final team purely for display."
