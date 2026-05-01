@@ -10,12 +10,14 @@ MARSHAL_ID = "agent_synthetic_marshal"
 
 
 def kickoff(run_id: str, subtask: dict, coalition_agent_ids: list[str],
-            upstream_summaries: list[dict]) -> str:
+            upstream_summaries: list[dict],
+            criteria: list[dict] | None = None) -> str:
     prompt = render(
         "marshal_kickoff",
         subtask=subtask,
         coalition_agent_ids=coalition_agent_ids,
         upstream_summaries=upstream_summaries,
+        criteria=criteria or [],
     )
     text = chat(prompt, role="marshal_kickoff", subtask_id=subtask["subtask_id"])
     post(run_id, subtask["subtask_id"], MARSHAL_ID, "marshal", 0, text)

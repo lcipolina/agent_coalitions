@@ -64,7 +64,8 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
     return list(seen.values())[:15]
 
 
-def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict]) -> dict:
+def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict],
+                    criteria: list[dict] | None = None) -> dict:
     db = get_db()
     db.subtasks.update_one(
         {"run_id": run_id, "subtask_id": subtask["subtask_id"]},
@@ -120,7 +121,8 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict]) ->
     )
 
     # Round 0: marshal kickoff.
-    kickoff_text = kickoff(run_id, subtask, coalition_agent_ids, upstream_outputs)
+    kickoff_text = kickoff(run_id, subtask, coalition_agent_ids, upstream_outputs,
+                           criteria=criteria)
     emit("round_posted", {"subtask_id": subtask["subtask_id"],
                           "round": 0, "sender": MARSHAL_ID})
 

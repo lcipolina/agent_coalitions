@@ -33,6 +33,7 @@ from src.pipeline.reputation import apply_run_reputations
 from src.pipeline.surveyor import estimate
 from src.pipeline.synthesis import synthesise
 from src.pipeline.validation import validate
+from src.pipeline.validator_spec import derive_validation_spec
 from src.pipeline.visualiser import build_geometry
 from src.core.progress import emit
 
@@ -111,6 +112,15 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
     })
     emit("stage_end", {"stage": "decompose"})
 
+    # Stage 2.5: derive validation spec from the prompt and persist on runs.
+    # The criteria are also passed into every marshal kickoff so coalitions
+    # know what they will ultimately be judged on.
+    emit("stage_start", {"stage": "validator_spec"})
+    val_spec = derive_validation_spec(run_id, prompt)
+    criteria = val_spec.get("criteria", [])
+    emit("validation_spec_derived", {"n_criteria": len(criteria)})
+    emit("stage_end", {"stage": "validator_spec"})
+
     # Stage 3: execute subtasks (each writes assignment + messages + output).
     emit("stage_start", {"stage": "execute"})
     total = len(ordered)
@@ -121,7 +131,7 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
             "subtask_id": st["subtask_id"], "title": st["title"],
             "idx": idx, "total": total,
         })
-        execute_subtask(run_id, st_doc, upstream)
+        execute_subtask(run_id, st_doc, upstream, criteria=criteria)
         emit("subtask_end", {"subtask_id": st["subtask_id"]})
     emit("stage_end", {"stage": "execute"})
 

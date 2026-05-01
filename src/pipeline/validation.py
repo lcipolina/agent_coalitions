@@ -1,11 +1,15 @@
-"""Deterministic validator + LLM-judge wrapper.
+"""Validator: evaluate the synthesised spec against the per-run criteria.
 
-Five deterministic checks per Amendment 3.6:
-  1. span_to_depth_ratio
-  2. support_count_consistency
-  3. live_load_arithmetic
-  4. material_span_plausibility
-  5. lane_geometry
+The criteria come from the Validator-Spec agent (``src.pipeline.validator_spec``)
+which writes them onto the ``runs`` row at the start of the pipeline. Each
+criterion has an optional structured ``check`` block that this module knows
+how to evaluate generically; criteria with ``check is None`` are reported
+as ``qualitative`` and rely on the LLM judge for narrative assessment.
+
+The legacy bridge-domain helpers (``_check_span_to_depth``, …) are kept
+intact below because the unit tests import them directly. They are no
+longer invoked from ``validate()`` — their behaviour is now expressed by
+the bridge-default criteria emitted by the mock validator-spec agent.
 """
 from __future__ import annotations
 
@@ -98,19 +102,100 @@ def _overall(checks: list[dict]) -> str:
     return "conceptual_pass"
 
 
+# ---------------------------------------------------------------------------
+# Generic criterion dispatcher (used by validate())
+# ---------------------------------------------------------------------------
+def _resolve_field(spec: dict, path: str) -> Any:
+    """Resolve a dotted path into the spec, with a few computed shortcuts.
+
+    Computed fields (not literally in the spec, but derivable):
+      - span_to_depth_ratio
+      - support_count_consistent  (bool)
+      - live_load_total_kN        (q * w * L)
+      - deck_width_per_lane_m
+    """
+    if path == "span_to_depth_ratio":
+        layout = spec.get("span_layout") or []
+        span = max((s.get("length_m", 0) for s in layout), default=0)
+        depth = spec.get("structural_depth_m") or max(span / 12.0, 1.0)
+        return span / depth if depth > 0 else 0
+    if path == "support_count_consistent":
+        layout = spec.get("span_layout") or []
+        n_supports = spec.get("n_supports", len(layout) + 1)
+        sum_l = sum(s.get("length_m", 0) for s in layout)
+        total = spec.get("total_length_m", sum_l)
+        return ((len(layout) + 1) == n_supports
+                and abs(sum_l - total) <= 0.02 * max(total, 1))
+    if path == "live_load_total_kN":
+        return (spec.get("design_live_load_kN_per_m", 0)
+                * spec.get("deck_width_m", 0)
+                * spec.get("total_length_m", 0))
+    if path == "deck_width_per_lane_m":
+        lanes = spec.get("lanes", 0) or 0
+        width = spec.get("deck_width_m", 0) or 0
+        return width / lanes if lanes else 0
+
+    cur: Any = spec
+    for part in path.split("."):
+        if isinstance(cur, dict):
+            cur = cur.get(part)
+        else:
+            return None
+    return cur
+
+
+def _evaluate_criterion(criterion: dict, spec: dict) -> dict:
+    cid = criterion.get("id", "C?")
+    name = criterion.get("must_have", cid)
+    check = criterion.get("check")
+    if not check:
+        return {"name": cid, "status": "qualitative", "value": None,
+                "note": name}
+    op = check.get("op")
+    field = check.get("spec_field")
+    target = check.get("value")
+    actual = _resolve_field(spec, field)
+    status = "fail"
+    try:
+        if op == "lte":
+            status = "pass" if actual is not None and actual <= target else "fail"
+        elif op == "gte":
+            status = "pass" if actual is not None and actual >= target else "fail"
+        elif op == "between":
+            lo, hi = target
+            if actual is None:
+                status = "fail"
+            elif lo <= actual <= hi:
+                status = "pass"
+            elif (lo * 0.5) <= actual <= (hi * 1.5):
+                status = "warning"
+            else:
+                status = "fail"
+        elif op == "present":
+            status = "pass" if actual not in (None, "", [], {}) else "fail"
+        elif op == "equals_any":
+            status = "pass" if actual in (target or []) else "fail"
+    except Exception as exc:  # noqa: BLE001
+        log.warning("criterion %s failed to evaluate: %s", cid, exc)
+        status = "fail"
+    return {"name": cid, "status": status,
+            "value": {"actual": actual, "expected": {"op": op, "value": target},
+                      "field": field},
+            "note": name}
+
+
 def validate(run_id: str, spec: dict) -> dict:
-    checks = [
-        _check_span_to_depth(spec),
-        _check_support_count(spec),
-        _check_live_load(spec),
-        _check_material_span(spec),
-        _check_lane_geometry(spec),
-    ]
-    overall = _overall(checks)
+    db = get_db()
+    run_doc = db.runs.find_one({"run_id": run_id}, {"_id": 0, "validation_spec": 1})
+    val_spec = (run_doc or {}).get("validation_spec") or {"criteria": []}
+    checks = [_evaluate_criterion(c, spec) for c in val_spec.get("criteria", [])]
+    # Overall status considers only quantitative outcomes; qualitative
+    # criteria are surfaced for the judge / human reviewer.
+    quantitative = [c for c in checks if c["status"] != "qualitative"]
+    overall = _overall(quantitative) if quantitative else "conceptual_pass_with_warnings"
 
     # LLM judge per subtask output (clarity / completeness / consistency 0-10).
     judge_scores = []
-    db = get_db()
     outputs = list(db.subtask_outputs.find({"run_id": run_id}, {"_id": 0}))
     for o in outputs:
         raw = chat(
@@ -130,6 +215,7 @@ def validate(run_id: str, spec: dict) -> dict:
         "checks": checks,
         "overall_status": overall,
         "judge_scores": judge_scores,
+        "validation_spec": val_spec,
     }
     insert_with_event(
         "validation_results", doc,

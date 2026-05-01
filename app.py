@@ -347,6 +347,23 @@ with tab_val:
             st.warning(f"Overall: **{status}**")
         else:
             st.error(f"Overall: **{status}**")
+
+        # Validation spec (the prompt-derived criteria the marshals were briefed on).
+        val_spec = v.get("validation_spec") or {}
+        criteria = val_spec.get("criteria") or []
+        if criteria:
+            st.markdown("#### Acceptance criteria (derived from the prompt)")
+            if val_spec.get("narrative"):
+                st.caption(val_spec["narrative"])
+            st.dataframe(
+                [{"id": c["id"], "must_have": c["must_have"],
+                  "structured_check": "yes" if c.get("check") else "no",
+                  "rationale": c.get("rationale", "")}
+                 for c in criteria],
+                use_container_width=True, hide_index=True,
+            )
+
+        st.markdown("#### Check results")
         st.dataframe(v["checks"], use_container_width=True, hide_index=True)
         st.markdown("#### Judge scores per subtask")
         st.dataframe(v.get("judge_scores", []),

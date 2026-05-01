@@ -10,16 +10,17 @@ The system was built for a one-day hackathon, so every choice is calibrated to t
 
 A user submits a single design brief, e.g. *"design a 2 km bridge for 50 cars/h with trucks, modern aesthetic"*. The pipeline returns a conceptual bridge proposal: a final spec table, a deterministic validation card, a costed quantity take-off in EUR, a side-elevation visualisation, and a markdown brief.
 
-Internally, this is delivered by a fixed eight-stage sequential pipeline:
+Internally, this is delivered by a fixed nine-stage sequential pipeline:
 
 1. **Decompose** — a single LLM call splits the brief into a 5–8-node DAG of subtasks (site, loads, materials, structural system, aesthetics, validation prep, final synthesis).
-2. **Execute subtasks** — for each subtask, the system retrieves candidate skills via Atlas Vector Search, forms a small coalition of skills, picks ≤ 3 agents that cover those skills, runs a three-round blackboard exchange (marshal kickoff → parallel agent contributions → marshal reconcile), and writes a token-capped subtask output.
-3. **Synthesise** — one LLM call rolls every subtask output into a structured `design_specs` JSON.
-4. **Validate** — five deterministic checks (span/depth, support-count consistency, live-load arithmetic, material/span plausibility, lane geometry) plus a per-subtask LLM judge with clarity/completeness/consistency scores.
-5. **Cost** — a quantity-take-off heuristic over the spec, multiplied by a fixed `cost_model.json` rate card, with a 10% finishing premium and 15% contingency, and a one-paragraph surveyor narrative.
-6. **Visualise** — a deterministic spec-to-primitives builder turns the design spec into a generic 3D geometry artifact (a list of axis-aligned boxes and polylines with absolute world coordinates) and writes it as an `artifacts` row of kind `geometry_json`. The renderer in the UI is intentionally domain-agnostic; see §6.
-7. **Report** — a markdown brief with the final spec table, validation card, cost roll-up, and a per-team contribution section.
-8. **Reputation** — every participating agent gets a per-run reputation delta scaled by load (subtasks participated in) and quality (mean contribution score), persisted on the `agents` collection.
+2. **Validation-spec** — a Validator-Spec agent reads the brief and emits a small list of acceptance criteria (id / must-have / optional structured `check` block with op `lte|gte|between|present|equals_any`). The list is persisted on the `runs` row and threaded into every marshal kickoff so each coalition is briefed on what the design will be judged on. On parse failure the pipeline falls back to a single qualitative criterion.
+3. **Execute subtasks** — for each subtask, the system retrieves candidate skills via Atlas Vector Search, forms a small coalition of skills, picks ≤ 3 agents that cover those skills, runs a three-round blackboard exchange (marshal kickoff → parallel agent contributions → marshal reconcile), and writes a token-capped subtask output.
+4. **Synthesise** — one LLM call rolls every subtask output into a structured `design_specs` JSON.
+5. **Validate** — a generic dispatcher evaluates each criterion in `runs.validation_spec` against the synthesised spec (with a small set of computed virtual fields such as `span_to_depth_ratio` so the criteria can stay in natural top-level vocabulary). Criteria without a structured `check` are recorded as `qualitative` and surfaced to the LLM judge, which scores each subtask output on clarity/completeness/consistency.
+6. **Cost** — a quantity-take-off heuristic over the spec, multiplied by a fixed `cost_model.json` rate card, with a 10% finishing premium and 15% contingency, and a one-paragraph surveyor narrative.
+7. **Visualise** — an LLM-backed Visualiser agent (with a deterministic primitives fallback) emits a generic 3D geometry artifact: a list of axis-aligned boxes and polylines with absolute world coordinates, stored as an `artifacts` row of kind `geometry_json`. The renderer in the UI is intentionally domain-agnostic; see §6.
+8. **Report** — a markdown brief with the final spec table, validation card, cost roll-up, and a per-team contribution section.
+9. **Reputation** — every participating agent gets a per-run reputation delta scaled by load (subtasks participated in) and quality (mean contribution score), persisted on the `agents` collection.
 
 The pipeline is also **replayable**: given a `run_id`, the orchestrator can re-read every artefact from MongoDB without making any LLM calls. This is asserted in code (`openai_client.call_counter() == 0` after replay) and exercised by the Streamlit "Replay current" button.
 

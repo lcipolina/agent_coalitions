@@ -84,9 +84,32 @@ def _decomposer(prompt: str, **_: Any) -> str:
 
 
 def _marshal_kickoff(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
+    # Surface the validation criteria block from the rendered prompt (if any)
+    # so the Blackboard tab shows the marshal briefing the team on what the
+    # work will be judged on.
+    criteria_block = ""
+    if "acceptance criteria" in prompt.lower():
+        # Pull out the bullet list of criterion ids -> must_haves.
+        lines = []
+        capture = False
+        for line in prompt.splitlines():
+            if "acceptance criteria" in line.lower():
+                capture = True
+                continue
+            if capture:
+                if line.startswith("- ["):
+                    lines.append(line.strip())
+                elif lines and not line.strip():
+                    break
+        if lines:
+            criteria_block = (
+                "\nKeep these acceptance criteria in mind:\n"
+                + "\n".join(lines[:5])
+            )
     return (
         f"[mock-marshal {subtask_id}] Coalition, please post your contribution "
         f"focusing on the subtask requirements. Cite upstream summaries where relevant."
+        f"{criteria_block}"
     )
 
 
@@ -199,6 +222,38 @@ def _judge(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
     })
 
 
+def _validator_spec(prompt: str, **_: Any) -> str:
+    """Bridge-default criteria roughly mirroring the legacy 5 deterministic checks."""
+    return json.dumps({
+        "criteria": [
+            {"id": "C1",
+             "must_have": "Span-to-depth ratio of the longest span lies in [8, 18].",
+             "rationale": "Standard structural slenderness band.",
+             "check": {"spec_field": "span_to_depth_ratio", "op": "between", "value": [8, 18]}},
+            {"id": "C2",
+             "must_have": "Support count is consistent with the span layout.",
+             "rationale": "Every span ends on a support.",
+             "check": {"spec_field": "support_count_consistent", "op": "equals_any", "value": [True]}},
+            {"id": "C3",
+             "must_have": "Total live-load capacity (q*w*L) lies in [1e3, 1e6] kN.",
+             "rationale": "Bounds the design between sidewalk-only and abnormal heavy-haulage.",
+             "check": {"spec_field": "live_load_total_kN", "op": "between", "value": [1000, 1000000]}},
+            {"id": "C4",
+             "must_have": "Primary structural material matches the longest span (no timber > 120 m, no concrete > 250 m).",
+             "rationale": "Guards against materially-impossible primary system.",
+             "check": None},
+            {"id": "C5",
+             "must_have": "Deck width accommodates the lane count at >= 3.5 m per lane.",
+             "rationale": "Code-minimum lane width.",
+             "check": {"spec_field": "deck_width_per_lane_m", "op": "gte", "value": 3.5}},
+        ],
+        "narrative": ("Bridge-domain default criteria. The marshals should "
+                      "treat span/depth, support consistency, live-load bounds, "
+                      "material/span coherence and lane geometry as the conceptual "
+                      "validation gate."),
+    })
+
+
 _ROUTERS = {
     "decomposer": _decomposer,
     "marshal_kickoff": _marshal_kickoff,
@@ -208,6 +263,7 @@ _ROUTERS = {
     "surveyor_narrative": _surveyor_narrative,
     "reporter": _reporter,
     "judge": _judge,
+    "validator_spec": _validator_spec,
 }
 
 

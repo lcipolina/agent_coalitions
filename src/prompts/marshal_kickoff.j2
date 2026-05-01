@@ -20,6 +20,13 @@ Upstream summaries:
 (none — this is a root subtask)
 {% endif %}
 
+{% if criteria %}
+Design-level acceptance criteria (the work will ultimately be judged on these):
+{% for c in criteria %}
+- [{{ c.id }}] {{ c.must_have }}
+{% endfor %}
+{% endif %}
+
 Write a short kickoff message (≤120 words) that:
 1. States the goal of this subtask in one sentence.
 2. Assigns each agent a clear angle of contribution.
