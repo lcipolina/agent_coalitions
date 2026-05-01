@@ -1,0 +1,19 @@
+name: coalitions
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - pymongo[srv]==4.*
+      - openai==1.*
+      - python-dotenv==1.*
+      - streamlit==1.*
+      - plotly==5.*
+      - langgraph==0.*
+      - langchain-core==0.*
+      - tiktoken==0.*
+      - pydantic==2.*
+      - pytest==8.*
+      - numpy

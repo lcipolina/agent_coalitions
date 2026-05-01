@@ -282,7 +282,7 @@ Run the listed self-check before committing. Stop and report on failure.
 
 | Gate | Self-check |
 |---|---|
-| G1 | `conda env create -f environment.yml && conda activate agent-coalitions && python -c "import pymongo, openai, streamlit, plotly, dotenv, langgraph"` exits 0. |
+| G1 | `conda env create -f environment.yml && conda activate coalitions && python -c "import pymongo, openai, streamlit, plotly, dotenv, langgraph"` exits 0. |
 | G2 | `cp .env.example .env`, fill secrets, then `python -c "from src.config import settings; print(settings.mongodb_db)"` prints `agent_coalitions`. `grep -RIn "sk-" src/` returns no hits outside `config.py`. |
 | G3 | `python -m src.scripts.ping_mongo` connects, lists collections, creates the 11 collections + indexes (vector index attempted via `create_search_index`), exits 0. |
 | G4 | `python -m src.scripts.ingest_skills` populates `skills` (~30–50) and `agents` (=20); printed counts match seed file. |

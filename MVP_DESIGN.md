@@ -14,7 +14,7 @@
 
 Lead-confirmed amendments resolving every ambiguity flagged in `PLAN.md §3`. Where this block conflicts with the body of the document, **this block wins**.
 
-1. **Naming (Q21).** The word "market" is banned in current usage. DB name `agent_market` → **`agent_coalitions`**. Conda env `agent-market` → **`agent-coalitions`**. Project / app title "Agent Market" → **"Agent Coalitions"**. Streamlit tab #2 "Agent Market" → **"Assignments"** (tab #3 "Coalitions" unchanged). Run button "Run Agent Market" → **"Run Coalitions"**. §10 narration drops the "agent market for short" phrasing. Appendix A retained as historical discussion.
+1. **Naming (Q21).** The word "market" is banned in current usage. DB name `agent_market` → **`agent_coalitions`**. Conda env `agent-market` → **`coalitions`**. Project / app title "Agent Market" → **"Agent Coalitions"**. Streamlit tab #2 "Agent Market" → **"Assignments"** (tab #3 "Coalitions" unchanged). Run button "Run Agent Market" → **"Run Coalitions"**. §10 narration drops the "agent market for short" phrasing. Appendix A retained as historical discussion.
 2. **Summary token cap (Q1).** Standardised on **≤ 200 tokens** for `subtask_outputs.summary` everywhere. Truncation via `tiktoken`.
 3. **Algorithm definitions filled in (§4.2; Q3, Q4, Q5).** `coverage(s, q) = clip(cosine(emb(s), emb(q)), 0, 1)`. `prior_reputation(s)` = min-max normalisation across the catalog of `0.5·log(1+installs) + 0.5·log(1+stars)`. The γ term reads `log(1+installs(s)) / log(1+max_installs_in_catalog)`, ∈ [0,1].
 4. **Default 7-subtask DAG (§4.1; Q6).** Used as decomposer fallback and by mock decomposer: T1 Site & geometry; T2 Load profile; T3 Material selection (deps T1,T2); T4 Structural system (deps T1,T2,T3); T5 Aesthetic & elevation guidance (deps T1,T4); T6 Validation prep (deps T3,T4); T7 Final synthesis brief (deps all).
@@ -696,7 +696,7 @@ The coding agent **must** follow this section verbatim. Deviations require a wri
 
 1. **Single Python process.** No external services other than MongoDB Atlas and OpenAI.
 2. **Python 3.10+.**
-3. **Reproducible environment.** Create a dedicated conda environment (`environment.yml` checked into the repo, name `agent-coalitions`) so teammates can clone and run with a single `conda env create -f environment.yml`. Pin major versions of `pymongo`, `openai`, `streamlit`, `plotly`, `python-dotenv`, `langgraph`, `tiktoken`. A `requirements.txt` mirror is fine but the conda env is the source of truth.
+3. **Reproducible environment.** Create a dedicated conda environment (`environment.yml` checked into the repo, name `coalitions`) so teammates can clone and run with a single `conda env create -f environment.yml`. Pin major versions of `pymongo`, `openai`, `streamlit`, `plotly`, `python-dotenv`, `langgraph`, `tiktoken`. A `requirements.txt` mirror is fine but the conda env is the source of truth.
 4. **All secrets via `.env` (python-dotenv).** Provide a tracked `.env.example` with placeholder values for `MONGODB_URI`, `MONGODB_DB`, `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL`, `OPENAI_CHAT_MODEL`, `USE_MOCK_LLM`. The real `.env` is gitignored. `src/config.py` is the single point of `load_dotenv()` and exposes typed config to the rest of the codebase. **No secret literal anywhere else in the source tree.**
 5. **All Mongo writes idempotent on retry.** Use `run_id` as the partition key for everything.
 6. **Mock mode is first-class.** Develop in mock mode first; LLMs come last.
@@ -744,7 +744,7 @@ The agent must work in small commits and tick off these gates **in order**. Each
 
 | # | Gate | Pass check |
 |---|------|-----------|
-| G1 | Conda env reproducible | `conda env create -f environment.yml` succeeds on a clean shell; `conda activate agent-coalitions && python -c "import pymongo, openai, streamlit, plotly, dotenv, langgraph, tiktoken"` exits 0. |
+| G1 | Conda env reproducible | `conda env create -f environment.yml` succeeds on a clean shell; `conda activate coalitions && python -c "import pymongo, openai, streamlit, plotly, dotenv, langgraph, tiktoken"` exits 0. |
 | G2 | Config + secrets wiring | `cp .env.example .env`, fill in MONGODB_URI + OPENAI_API_KEY, then `python -c "from src.config import settings; print(settings.mongodb_db)"` prints the db name. No secret literal anywhere outside `.env`. |
 | G3 | Mongo connectivity | `python -m src.scripts.ping_mongo` connects, lists collections, creates the 11 collections + indexes from § 3, exits 0. |
 | G4 | Skills ingested | `python -m src.scripts.ingest_skills` populates `skills` and `agents` from `skills_seed.json`; counts printed match the seed file. |
