@@ -19,7 +19,7 @@ EOF
 
 # 3. Snapshot the spec as commit #1, BEFORE the agent touches anything
 git add -A
-git commit -m "spec: MVP_DESIGN.md + GAME_THEORY_PRIMER.md locked"
+git commit -m "spec: MVP_DESIGN.md locked"
 
 git reset --hard HEAD          # throw away uncommitted changes
 git log --oneline              # see commits

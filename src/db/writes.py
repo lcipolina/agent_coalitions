@@ -25,7 +25,8 @@ def log_event(
     *,
     db: Database | None = None,
 ) -> None:
-    (db or get_db()).events.insert_one(
+    db = db if db is not None else get_db()
+    db.events.insert_one(
         {"run_id": run_id, "ts": _now(), "kind": kind, "payload": payload or {}}
     )
 
@@ -42,7 +43,7 @@ def insert_with_event(
 
     *doc* must contain a ``run_id`` field.
     """
-    db = db or get_db()
+    db = db if db is not None else get_db()
     if "run_id" not in doc:
         raise ValueError("doc must contain run_id for traceability")
     res = db[collection].insert_one(doc)

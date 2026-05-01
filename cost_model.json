@@ -1,0 +1,11 @@
+{
+  "currency": "EUR",
+  "structural_steel_per_tonne": 3500,
+  "weathering_steel_per_tonne": 4000,
+  "structural_concrete_per_m3": 180,
+  "deck_slab_per_m2": 350,
+  "pier_each": 150000,
+  "abutment_each": 220000,
+  "finishing_premium_pct": 10,
+  "contingency_pct": 15
+}

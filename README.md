@@ -40,12 +40,6 @@ conda activate coalitions
 python -c "import pymongo, openai, streamlit, plotly, dotenv, langgraph, tiktoken; print('OK')"
 ```
 
-If `conda env create` fails on a dependency, the most common fix is:
-
-```bash
-conda env remove -n coalitions
-conda env create -f environment.yml
-```
 
 A `requirements.txt` mirror is provided for non-conda users (`python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`), but the conda env remains the source of truth.
 
@@ -95,7 +89,3 @@ The project is built gate-by-gate per `PLAN.md`. Each gate corresponds to one gi
 | G11 | Demo script passes | pending |
 
 ---
-
-## Disclaimer
-
-*Conceptual design produced by an experimental multi-agent system. Not certified engineering. Not for construction.*
