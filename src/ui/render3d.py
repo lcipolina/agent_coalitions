@@ -108,10 +108,10 @@ def render_geometry(geometry: dict[str, Any]) -> go.Figure:
                        backgroundcolor="#eef2f5", showbackground=True),
             aspectmode="manual",
             aspectratio=dict(x=ax_x, y=ax_y, z=ax_z),
-            camera=dict(eye=dict(x=1.6, y=-1.9, z=1.1)),
+            camera=dict(eye=dict(x=1.35, y=-1.55, z=0.85)),
         ),
         margin=dict(l=0, r=0, t=40, b=0),
-        height=580,
+        height=760,
         showlegend=False,
         paper_bgcolor="white",
     )
