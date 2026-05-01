@@ -18,10 +18,10 @@ from src.db.writes import insert_with_event, log_event
 from src.llm.openai_client import chat, embed
 from src.llm.prompts import render
 from src.agents.marshal import MARSHAL_ID, kickoff, reconcile
-from src.matching import search_skills
+from src.db.matching import search_skills
 from src.agents.set_cover import cover_skills_with_agents
-from src.progress import emit
-from src.tokens import truncate_to_tokens
+from src.core.progress import emit
+from src.core.tokens import truncate_to_tokens
 
 
 def _candidates_for(subtask: dict) -> list[CandidateSkill]:

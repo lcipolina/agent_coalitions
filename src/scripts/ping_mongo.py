@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from src.config import settings
+from src.core.config import settings
 from src.db.client import COLLECTIONS, get_db
 from src.db.indexes import ensure_all
 

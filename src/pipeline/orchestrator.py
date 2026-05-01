@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from src.config import settings
+from src.core.config import settings
 from src.db.client import get_db
 from src.db.writes import insert_with_event, log_event
 from src.pipeline.decomposer import decompose
@@ -34,7 +34,7 @@ from src.pipeline.surveyor import estimate
 from src.pipeline.synthesis import synthesise
 from src.pipeline.validation import validate
 from src.pipeline.visualiser import build_geometry
-from src.progress import emit
+from src.core.progress import emit
 
 log = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 from src.agents.blackboard import post, read
 from src.llm.openai_client import chat
 from src.llm.prompts import render
-from src.tokens import truncate_to_tokens
+from src.core.tokens import truncate_to_tokens
 
 MARSHAL_ID = "agent_synthetic_marshal"
 

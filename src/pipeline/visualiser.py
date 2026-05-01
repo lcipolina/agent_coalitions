@@ -40,7 +40,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from src.config import settings
+from src.core.config import settings
 from src.db.client import get_db
 from src.db.writes import insert_with_event
 from src.llm.openai_client import chat

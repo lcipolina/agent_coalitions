@@ -6,7 +6,7 @@ from functools import lru_cache
 from pymongo import MongoClient
 from pymongo.database import Database
 
-from src.config import settings
+from src.core.config import settings
 
 # Per MVP_DESIGN.md §3 — note: spec text says "11 collections" but enumerates 13
 # (skills, agents, runs, subtasks, assignments, coalition_messages,

@@ -1,5 +1,5 @@
 """Sanity test for matching.search_skills (mock-mode embeddings)."""
-from src.matching import search_skills
+from src.db.matching import search_skills
 
 
 def test_search_returns_hits():

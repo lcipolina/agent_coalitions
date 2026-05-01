@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.config import settings
+from src.core.config import settings
 from src.db.client import get_db
 from src.llm.openai_client import embed
 

@@ -22,7 +22,7 @@ import logging
 from threading import Lock
 from typing import Any
 
-from src.config import settings
+from src.core.config import settings
 from src.llm import mock as _mock
 
 log = logging.getLogger(__name__)

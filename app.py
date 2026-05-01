@@ -19,10 +19,10 @@ os.environ.setdefault("USE_MOCK_LLM", "true")
 
 import streamlit as st  # noqa: E402
 
-from src.config import settings  # noqa: E402
+from src.core.config import settings  # noqa: E402
 from src.db.client import get_db  # noqa: E402
 from src.pipeline.orchestrator import replay, run_pipeline  # noqa: E402
-from src.progress import set_listener  # noqa: E402
+from src.core.progress import set_listener  # noqa: E402
 
 st.set_page_config(
     page_title="Agent Coalitions — Bridge Design",

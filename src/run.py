@@ -25,6 +25,15 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",
     )
+    # Two mutually exclusive modes:
+    #   --replay <run_id>  : re-read every artifact for an existing run from
+    #                        MongoDB. Makes ZERO LLM calls (asserted inside
+    #                        replay()). This is, the demo
+    #                        proves reproducibility by replaying a past run
+    #                        without burning tokens or hitting the network.
+    #   --prompt "..."     : run the full 8-stage pipeline end-to-end on a
+    #                        fresh user brief. Writes a new runs row plus
+    #                        all downstream artifacts.
     if args.replay:
         out = replay(args.replay)
     elif args.prompt:

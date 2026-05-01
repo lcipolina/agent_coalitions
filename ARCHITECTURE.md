@@ -196,11 +196,12 @@ GAME_THEORY_PRIMER.md        # cooperative-game-theory background
 TODO.md                      # post-hackathon backlog
 
 src/
-  config.py                  # pydantic-settings; reads .env
-  matching.py                # Atlas $vectorSearch + cosine fallback
-  tokens.py                  # tiktoken count + truncate (200-tok cap)
-  progress.py                # progress event bus for the live UI
   run.py                     # CLI entrypoint
+
+  core/
+    config.py                # pydantic-settings; reads .env
+    progress.py              # progress event bus for the live UI
+    tokens.py                # tiktoken count + truncate (200-tok cap)
 
   llm/
     mock.py                  # deterministic embeddings + role-keyed chat
@@ -211,6 +212,7 @@ src/
 
   db/
     client.py, indexes.py, writes.py, seed.py
+    matching.py              # Atlas $vectorSearch + cosine fallback
 
   agents/
     coalitions.py            # rank-1 Shapley + pairwise complementarity

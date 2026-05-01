@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import sys
 
-from src.matching import search_skills
+from src.db.matching import search_skills
 
 
 def main(argv: list[str] | None = None) -> int:
