@@ -1,15 +1,28 @@
-"""Spec -> generic 3D geometry primitives.
+"""Spec -> generic 3D geometry primitives (Visualiser agent).
 
-Pipeline stage. Reads the synthesised design spec and emits a list of
-domain-agnostic primitives (boxes and polylines) with absolute world
-coordinates. Persists the result as an ``artifacts`` row of kind
-``geometry_json`` so it is replayable.
+Pipeline stage. The job is to translate the synthesised design spec
+(whose JSON schema is domain-dependent) into a uniform list of
+domain-agnostic primitives (boxes + polylines) that the renderer
+(``src.ui.render3d``) can draw without any domain knowledge.
 
-The renderer (``src.ui.render3d``) is intentionally dumb: it draws
-whatever primitives it is given, with no knowledge of bridges or any
-other domain. That keeps the visual layer reusable for any future
-spec shape (rollercoaster, tower, dam) — only this module would change,
-or eventually be replaced by an LLM call that emits primitives JSON.
+There are two execution paths:
+
+* **Mock mode** (``USE_MOCK_LLM=true``, the demo default). Runs a
+  deterministic Python builder that knows the bridge spec schema
+  (`total_length_m`, `span_layout`, `deck_width_m`, `bridge_type`, ...).
+  Fast, offline, reproducible.
+
+* **Real mode**. Calls ``chat(role="visualiser")`` with the spec and
+  the primitive schema. The LLM is the right tool here precisely
+  because different design domains (bridge, rollercoaster, tower, dam)
+  produce different spec schemas, and a hand-written Python switch
+  cannot scale to all of them. The LLM output is parsed and validated;
+  on any parse / validation failure, the deterministic bridge builder
+  is used as a fallback so the pipeline never crashes mid-demo.
+
+Either way the result is persisted as an ``artifacts`` row of kind
+``geometry_json``, making the picture replayable like every other
+artifact.
 
 Primitive schema::
 
@@ -22,13 +35,23 @@ Coordinate convention: x along structure length, y across width, z up.
 """
 from __future__ import annotations
 
+import json
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from src.config import settings
 from src.db.client import get_db
 from src.db.writes import insert_with_event
+from src.llm.openai_client import chat
+from src.llm.prompts import render
+
+log = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Primitive helpers
+# ---------------------------------------------------------------------------
 def _box(x0: float, x1: float, y0: float, y1: float,
          z0: float, z1: float, color: str, name: str) -> dict[str, Any]:
     return {"kind": "box",
@@ -51,8 +74,9 @@ def _support_xs(spec: dict) -> list[float]:
     return xs
 
 
-def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
-    """Produce a geometry artifact for ``spec`` and persist it."""
+def _bridge_primitives(spec: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic bridge-spec -> geometry. Used in mock mode and as the
+    real-mode fallback when the LLM output cannot be parsed or validated."""
     L = float(spec.get("total_length_m") or
               sum((s.get("length_m", 0) for s in spec.get("span_layout") or []), 0)
               or 1000.0)
@@ -207,6 +231,92 @@ def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
         "axes": {"x": "length (m)", "y": "width (m)", "z": "height (m)"},
         "extent": {"x": [0.0, L], "y": [-W, W], "z": [-1.0, z_deck * 5]},
     }
+    return geometry
+
+
+# ---------------------------------------------------------------------------
+# LLM path
+# ---------------------------------------------------------------------------
+ALLOWED_KINDS = {"box", "line"}
+
+
+def _validate_geometry(data: Any) -> dict[str, Any]:
+    """Minimal schema check on LLM output. Raises ValueError on any issue."""
+    if not isinstance(data, dict):
+        raise ValueError("top-level must be an object")
+    prims = data.get("primitives")
+    if not isinstance(prims, list) or not prims:
+        raise ValueError("'primitives' must be a non-empty array")
+    clean: list[dict[str, Any]] = []
+    for i, p in enumerate(prims):
+        if not isinstance(p, dict):
+            raise ValueError(f"primitive #{i} not an object")
+        kind = p.get("kind")
+        if kind not in ALLOWED_KINDS:
+            raise ValueError(f"primitive #{i} kind={kind!r} not in {ALLOWED_KINDS}")
+        if kind == "box":
+            for ax in ("x", "y", "z"):
+                v = p.get(ax)
+                if not (isinstance(v, list) and len(v) == 2
+                        and all(isinstance(c, (int, float)) for c in v)):
+                    raise ValueError(f"box #{i} axis {ax!r} must be [lo, hi]")
+        else:  # line
+            pts = p.get("points")
+            if not (isinstance(pts, list) and len(pts) >= 2 and all(
+                    isinstance(q, list) and len(q) == 3
+                    and all(isinstance(c, (int, float)) for c in q)
+                    for q in pts)):
+                raise ValueError(f"line #{i} 'points' must be array of [x,y,z]")
+        clean.append(p)
+    return {
+        "primitives": clean,
+        "title": str(data.get("title", "")),
+        "axes": data.get("axes") or {"x": "x (m)", "y": "y (m)", "z": "z (m)"},
+    }
+
+
+def _strip_code_fences(text: str) -> str:
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else t[3:]
+        if t.endswith("```"):
+            t = t[: -3]
+    return t.strip()
+
+
+def _llm_geometry(spec: dict[str, Any]) -> dict[str, Any]:
+    """Call the Visualiser LLM. Raises on parse / validation failure."""
+    prompt = render("visualiser", spec_json=json.dumps(spec, default=str, indent=2))
+    text = chat(prompt, role="visualiser")
+    data = json.loads(_strip_code_fences(text))
+    return _validate_geometry(data)
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
+    """Produce a geometry artifact for ``spec`` and persist it.
+
+    Routing:
+      - mock mode  -> deterministic ``_bridge_primitives``.
+      - real mode  -> LLM Visualiser; on any failure, fall back to
+                      deterministic and log a warning.
+    """
+    source: str
+    if settings.use_mock_llm:
+        geometry = _bridge_primitives(spec)
+        source = "deterministic"
+    else:
+        try:
+            geometry = _llm_geometry(spec)
+            source = "llm"
+        except Exception as exc:  # noqa: BLE001 - any LLM failure is recoverable
+            log.warning("visualiser LLM failed (%s); using deterministic fallback",
+                        exc)
+            geometry = _bridge_primitives(spec)
+            source = "deterministic_fallback"
+    geometry["source"] = source
 
     db = get_db()
     insert_with_event(

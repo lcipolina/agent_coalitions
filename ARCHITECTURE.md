@@ -150,7 +150,7 @@ LangGraph remains an installed dependency so that adding a revision round (round
 
 ---
 
-## 10. Visualisation: a generic renderer fed by a domain-aware builder
+## 10. Visualisation: a generic renderer fed by a Visualiser agent
 
 The picture in the Rendering tab is not produced ad-hoc by the UI. It is the output of a real pipeline stage (`src/pipeline/visualiser.py`) that runs between the cost stage and the report stage, and writes an `artifacts` row of kind `geometry_json` for every run. That row is part of the replay surface: re-running the UI on a past `run_id` re-draws the picture without recomputing anything.
 
@@ -171,12 +171,15 @@ The artifact is a **generic 3D primitive list** with three keys:
 
 Two pieces, deliberately separated:
 
-- **The builder** (`src/pipeline/visualiser.py`) is where any domain knowledge lives. It reads the spec — total length, span layout, deck width, structural depth, bridge type — and emits primitives. For a cable-stayed bridge it emits a deck box, pier boxes, pylon boxes, and twin planes of fanned stay-cable polylines; for a suspension bridge it emits two towers and a parabolic main cable with vertical hangers; for an arch it emits a parabolic arch with spandrel verticals; for a truss it emits chords, diagonals and verticals; otherwise it emits the multi-girder default. The builder is the natural seam at which a real LLM call would be plugged in to support arbitrary domains (rollercoaster, tower, dam): the prompt asks the model to emit primitives JSON conforming to the schema above, and the rest of the system is unchanged.
+- **The Visualiser agent** (`src/pipeline/visualiser.py`) is responsible for translating *whatever* the design spec looks like into this primitive list. There are two execution paths:
+  - In **mock mode** (the demo default), a deterministic Python builder reads the bridge-spec schema (`total_length_m`, `span_layout`, `deck_width_m`, `bridge_type`, …) and emits primitives directly. This is fast, offline and reproducible. It is the right tool when the spec schema is fixed and known in advance.
+  - In **real mode**, the agent calls `chat(role="visualiser")` with the spec JSON and the primitive schema (template at `src/prompts/visualiser.j2`). The reason an LLM belongs here is that the synthesised spec schema is **domain-dependent**: a bridge has `span_layout`, a rollercoaster has `track_segments` and `loop_radii`, a tower has `floor_count`. A hand-written Python switch cannot enumerate every domain a judge might propose at the demo. The LLM reads any spec shape and emits the same uniform primitives JSON. Output is parsed and validated against a minimal schema (`kind` ∈ {box, line}; box has well-formed `x/y/z` ranges; line has ≥ 2 three-component points). Any failure logs a warning and falls back to the deterministic builder so the pipeline never crashes mid-demo.
+  - Either path tags the artifact with a `source` field (`deterministic` / `llm` / `deterministic_fallback`) so a replay can tell where the picture came from.
 - **The renderer** (`src/ui/render3d.py`) is intentionally dumb and generic. It draws a `box` primitive as a `go.Mesh3d` with the standard 12-triangle cuboid topology, and a `line` primitive as a `go.Scatter3d` polyline. It has no knowledge of bridges, decks, or cables. Adding a new primitive type later (`cylinder`, `mesh`) is a one-function change in the renderer; it does not require touching any pipeline code.
 
-Plotly is the chosen 3D library because it was already a dependency for the other tabs and it gives the demo interactive rotate / zoom for free. The renderer fixes `aspectmode="data"` so 1 m on the x axis is the same screen length as 1 m on the z axis — a 2 km × 30 m structure stays recognisably a deck rather than a cube.
+Plotly is the chosen 3D library because it was already a dependency for the other tabs and it gives the demo interactive rotate / zoom / hover for free. PyVista was considered and rejected: it is VTK-based, beautiful in a desktop window, and does not embed cleanly in Streamlit without an extra third-party component (`stpyvista`) — extra dependency, extra demo-day failure mode, negligible visual gain over Plotly. The renderer fixes `aspectmode="data"` so 1 m on the x axis is the same screen length as 1 m on the z axis — a 2 km × 30 m structure stays recognisably a deck rather than a cube.
 
-Coordinate convention is fixed: x along structure length, y across width, z up. This is the only contract between the builder and the renderer; everything else is data.
+Coordinate convention is fixed: x along structure length, y across width, z up. This is the only contract between the agent and the renderer; everything else is data.
 
 ---
 
