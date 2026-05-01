@@ -1,8 +1,12 @@
 {# Decomposer: split a user design prompt into 5-8 ordered subtasks. #}
-You are a senior bridge-engineering project manager. Decompose the user
-design prompt into 5 to 8 subtasks that together cover site & geometry,
-load profile, material selection, structural system, aesthetics,
-validation prep, and final synthesis.
+You are a senior conceptual-design project manager. The brief may describe a
+bridge, building, tower, roller-coaster, pavilion, transport hub, public
+sculpture or other structure. Decompose the brief into 5 to 8 subtasks that
+together cover, in order: (1) site / context / geometry, (2) load or use
+profile, (3) material selection, (4) primary structural / functional system,
+(5) aesthetic and experience design, (6) validation prep, and finally
+(7) synthesis. Adapt the wording of each subtask to the actual domain in
+the user's prompt — do not assume bridges.
 
 Output strict JSON in this exact shape (no markdown fences, no commentary):
 {
@@ -20,7 +24,9 @@ Output strict JSON in this exact shape (no markdown fences, no commentary):
 Rules:
 - 5 to 8 subtasks; subtask_id values are T1..T8 in order.
 - The DAG must be acyclic; depends_on may only reference earlier ids.
-- required_capabilities are short skill phrases (2-5 words each).
+- required_capabilities are short skill phrases (2-5 words each), tailored
+  to the domain (e.g. "ride dynamics", "track geometry layout",
+  "wind-load analysis", "facade cladding design", "code compliance").
 
 User prompt:
 {{ prompt }}

@@ -26,6 +26,7 @@ def _seed_from_text(text: str) -> int:
 
 
 def embed(text: str, dim: int = EMBEDDING_DIM) -> list[float]:
+    """Return a deterministic, content-keyed L2-normalised pseudo-embedding."""
     rng = np.random.default_rng(_seed_from_text(text))
     v = rng.standard_normal(dim).astype(np.float32)
     n = float(np.linalg.norm(v))
@@ -158,29 +159,54 @@ def _agent(prompt: str, agent_id: str = "agent_xxx", subtask_id: str = "T?", **_
 
 def _synthesizer(prompt: str, **_: Any) -> str:
     return json.dumps({
+        "design_type": "multi_span_cable_stayed_bridge",
+        "domain": "bridge",
+        "primary_material": "weathering_steel",
+        "secondary_material": "high_strength_concrete",
+        "aesthetic_style": "modern_minimal",
+        "dimensions": {"length_m": 2000, "width_m": 12, "height_m": 60},
+        "characteristics": {
+            "total_length_m": 2000,
+            "longest_span_m": 200,
+            "deck_width_m": 12,
+            "lanes": 2,
+            "design_live_load_kN_per_m": 12,
+        },
+        # Bridge-shaped fields kept for the deterministic geometry path.
         "bridge_type": "multi-span_cable_stayed",
         "span_layout": [{"length_m": 200, "supports": ["pier", "pier"]}] * 10,
         "total_length_m": 2000,
         "deck_width_m": 12,
         "lanes": 2,
         "design_live_load_kN_per_m": 12,
-        "primary_material": "weathering_steel",
         "deck_material": "concrete",
-        "aesthetic_style": "modern_minimal",
         "validation_status": "pending"
     })
 
 
 def _surveyor_narrative(prompt: str, **_: Any) -> str:
+    # Stay deliberately generic: the line items vary per run / per domain,
+    # so we hand the user a sentence that's true for any roll-up.
     return (
-        "Cost narrative (mock): primary structural steel dominates, deck slab and pier "
-        "construction are secondary drivers; 15% contingency applied per spec."
+        "Cost roll-up dominated by primary structural materials and major "
+        "surface finishings; conceptual-stage estimate, expect 20-30% drift "
+        "as the design firms up."
     )
+
+
+def _surveyor_qto(prompt: str, **_: Any) -> str:
+    # Two-bucket mock estimate (materials + labour).
+    return json.dumps({
+        "materials_eur": 1_000_000,
+        "labour_hours": 4_000,
+        "labour_rate_eur_per_h": 90,
+        "rationale": "Mock conceptual estimate; deterministic QTO is preferred.",
+    })
 
 
 def _reporter(prompt: str, **_: Any) -> str:
     return (
-        "# Conceptual Bridge Design Brief (mock)\n\n"
+        "# Conceptual Design Brief\n\n"
         "Conceptual design produced by an experimental multi-agent system. "
         "Not certified engineering. Not for construction.\n\n"
         "## Summary\nMulti-span cable-stayed, weathering steel primary with concrete deck. "
@@ -261,6 +287,7 @@ _ROUTERS = {
     "agent": _agent,
     "synthesizer": _synthesizer,
     "surveyor_narrative": _surveyor_narrative,
+    "surveyor_qto": _surveyor_qto,
     "reporter": _reporter,
     "judge": _judge,
     "validator_spec": _validator_spec,

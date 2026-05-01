@@ -1,16 +1,20 @@
 {# Final report executive summary. Concise lead-in only;
    the structural sections are assembled deterministically by the builder. #}
-You are writing a 3-4 sentence introduction for a conceptual bridge-design
-report.
+You are writing a 3-4 sentence introduction for a conceptual design report.
+The brief may be for any kind of structure (bridge, building, tower,
+roller-coaster, pavilion, etc.) — adapt your wording to the actual domain.
 
 User prompt:
 {{ prompt }}
 
-Bridge type: {{ spec.bridge_type }}
-Total length: {{ spec.total_length_m }} m
-Validation: {{ validation.overall_status }}
+Design type: {{ spec.get('design_type') or spec.get('bridge_type') or "unspecified" }}
+Domain: {{ spec.get('domain') or "unspecified" }}
+Primary material: {{ spec.get('primary_material') or "unspecified" }}
+{% if spec.get('dimensions') %}Overall extents: {{ spec.get('dimensions') }}
+{% elif spec.get('total_length_m') %}Total length: {{ spec.get('total_length_m') }} m
+{% endif %}Validation: {{ validation.overall_status }}
 Total cost: {{ cost.total }} {{ cost.currency }}
 
 Write only the introduction (no headings, no bullets, no fences).
-Acknowledge the brief, name the chosen typology, and call out one
-strength and one residual risk.
+Acknowledge the brief, name the chosen typology, and call out one strength
+and one residual risk that are appropriate for this domain.

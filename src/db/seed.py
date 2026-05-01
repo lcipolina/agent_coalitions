@@ -23,8 +23,8 @@ from src.llm.openai_client import embed
 SKILLS_SEED_PATH = Path(__file__).resolve().parents[2] / "data" / "skills_seed.json"
 
 AGENT_SKILL_DISTRIBUTION = (
-    [2] * 14 + [3] * 4 + [4] * 2
-)  # 20 agents total; sum = 28+12+8 = 48 skill-slots
+    [3] * 10 + [4] * 8 + [5] * 2
+)  # 20 agents total; sum = 30+32+10 = 72 skill-slots (covers all 70 skills + slack)
 N_AGENTS = len(AGENT_SKILL_DISTRIBUTION)  # 20
 
 _FIRST = ["Stella", "Marco", "Aria", "Boris", "Yuki", "Elena", "Hugo", "Nina",
@@ -50,11 +50,13 @@ def _compute_prior_reputations(skills: list[dict[str, Any]]) -> list[float]:
 
 
 def load_skills_seed() -> list[dict[str, Any]]:
+    """Load the raw skills_seed.json payload from disk (no DB I/O)."""
     with SKILLS_SEED_PATH.open() as f:
         return json.load(f)
 
 
 def seed_skills(*, drop: bool = False) -> int:
+    """Embed and upsert all seed skills into ``skills``; return the count written."""
     db = get_db()
     if drop:
         db.skills.delete_many({})
@@ -78,6 +80,11 @@ def seed_skills(*, drop: bool = False) -> int:
 
 
 def seed_agents(*, drop: bool = False) -> int:
+    """Synthesise 20 agents (+ 1 marshal) over the seeded skills; return count.
+
+    Skill assignments are sampled deterministically from ``settings.seed``
+    so reruns produce the same agents.
+    """
     db = get_db()
     if drop:
         db.agents.delete_many({})
@@ -92,10 +99,48 @@ def seed_agents(*, drop: bool = False) -> int:
     name_pool = [f"{f} {l}" for f, l in zip(_FIRST, _LAST)]
     rng.shuffle(name_pool)
 
+    # --- Skill assignment with full-coverage guarantee --------------------
+    # The greedy set-cover step downstream can only assign skills that some
+    # agent actually carries. With ``len(skills) > total_slots`` it's
+    # mathematically impossible to cover everything; below we both ensure
+    # ``total_slots >= len(skills)`` (see AGENT_SKILL_DISTRIBUTION above)
+    # AND distribute the skills round-robin so each skill is held by at
+    # least one agent before any random "filler" slots are drawn.
+    total_slots = sum(AGENT_SKILL_DISTRIBUTION)
+    if total_slots < len(skill_ids):
+        raise RuntimeError(
+            f"AGENT_SKILL_DISTRIBUTION sums to {total_slots} but there are "
+            f"{len(skill_ids)} skills; bump the distribution so every skill "
+            "can be carried by at least one agent."
+        )
+    # Pre-build empty per-agent skill lists, then walk a shuffled copy of
+    # the skill catalogue and drop one skill into the next agent that still
+    # has room. This guarantees a 1-to-1 coverage of all skills first.
+    per_agent_skills: list[list[str]] = [[] for _ in AGENT_SKILL_DISTRIBUTION]
+    capacity = list(AGENT_SKILL_DISTRIBUTION)
+    coverage_skills = list(skill_ids)
+    rng.shuffle(coverage_skills)
+    a_idx = 0
+    for sid in coverage_skills:
+        # Find the next agent that still has a free slot.
+        while capacity[a_idx] == 0:
+            a_idx = (a_idx + 1) % len(capacity)
+        per_agent_skills[a_idx].append(sid)
+        capacity[a_idx] -= 1
+        a_idx = (a_idx + 1) % len(capacity)
+    # Fill any remaining slots with random skills (allowing duplicates
+    # across agents for redundancy / Shapley spread, but never within the
+    # same agent).
+    for i, free in enumerate(capacity):
+        if free <= 0:
+            continue
+        pool = [s for s in skill_ids if s not in per_agent_skills[i]]
+        per_agent_skills[i].extend(rng.sample(pool, free))
+
     now = _now()
     docs = []
     for i, n_skills in enumerate(AGENT_SKILL_DISTRIBUTION):
-        chosen = rng.sample(skill_ids, n_skills)
+        chosen = per_agent_skills[i]
         rep = sum(prior_by_id[sid] for sid in chosen) / n_skills
         docs.append({
             "agent_id": f"agent_{i+1:03d}",
@@ -112,7 +157,7 @@ def seed_agents(*, drop: bool = False) -> int:
         })
     # Add the synthetic marshal agent (per amendment §3.5).
     docs.append({
-        "agent_id": "agent_synthetic_marshal",
+        "agent_id": "agent_marshal",
         "name": "Synthetic Marshal",
         "skill_ids": [],
         "polyvalence": 0,

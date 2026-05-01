@@ -30,6 +30,10 @@ _BASE_DELTA_BY_STATUS = {
 
 
 def apply_run_reputations(run_id: str, overall_status: str) -> int:
+    """Compute and persist per-agent reputation deltas for one completed run.
+
+    Returns the number of ``reputation_updates`` rows written.
+    """
     db = get_db()
     base = _BASE_DELTA_BY_STATUS.get(overall_status, 0.0)
 

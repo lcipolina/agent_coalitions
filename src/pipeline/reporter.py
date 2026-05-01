@@ -12,26 +12,88 @@ DISCLAIMER = (
 )
 
 
-def _bridge_characteristics_md(spec: dict) -> str:
-    """Render the final bridge characteristics as a compact markdown table."""
+def _format_value(v) -> str:
+    if isinstance(v, bool):
+        return "yes" if v else "no"
+    if isinstance(v, (int, float)):
+        # Compact number with thousands separator.
+        return f"{v:,}" if isinstance(v, int) or v == int(v) else f"{v:,.2f}"
+    if isinstance(v, list):
+        return ", ".join(_format_value(x) for x in v) if v else "—"
+    if isinstance(v, dict):
+        return ", ".join(f"{k}: {_format_value(val)}" for k, val in v.items()) or "—"
+    return str(v) if v not in (None, "") else "—"
+
+
+_HUMAN_LABELS = {
+    "design_type": "Design type",
+    "domain": "Domain",
+    "primary_material": "Primary material",
+    "secondary_material": "Secondary material",
+    "deck_material": "Deck material",
+    "aesthetic_style": "Aesthetic style",
+    "total_length_m": "Total length (m)",
+    "deck_width_m": "Deck width (m)",
+    "lanes": "Lanes",
+    "design_live_load_kN_per_m": "Design live load (kN/m)",
+    "structural_depth_m": "Structural depth (m)",
+}
+
+
+def _humanise(key: str) -> str:
+    if key in _HUMAN_LABELS:
+        return _HUMAN_LABELS[key]
+    # snake_case → Title Case, keeping unit suffixes legible.
+    parts = key.replace("_", " ").split()
+    return " ".join(p if p.isupper() else p.capitalize() for p in parts)
+
+
+def _design_characteristics_md(spec: dict) -> str:
+    """Render the final design characteristics as a compact markdown table.
+
+    Domain-agnostic: walks the canonical top-level fields plus the
+    free-form ``characteristics`` and ``dimensions`` sub-dicts. Skips
+    pipeline-internal keys (run_id, validation_status, _id, etc.).
+    """
+    skip = {"run_id", "validation_status", "_id", "characteristics",
+            "dimensions", "span_layout"}
+    # Hide the legacy bridge-shaped fields entirely when this isn't a bridge.
+    if (spec.get("domain") or "").lower() != "bridge":
+        skip |= {"bridge_type", "total_length_m", "deck_width_m", "lanes",
+                 "design_live_load_kN_per_m", "structural_depth_m",
+                 "deck_material"}
+
+    rows: list[tuple[str, str]] = []
+    for k, v in spec.items():
+        if k in skip:
+            continue
+        if v in (None, "", 0, [], {}):
+            continue
+        rows.append((_humanise(k), _format_value(v)))
+
+    dims = spec.get("dimensions") or {}
+    for k, v in dims.items():
+        if v in (None, "", 0):
+            continue
+        rows.append((_humanise(k), _format_value(v)))
+
+    chars = spec.get("characteristics") or {}
+    for k, v in chars.items():
+        if v in (None, ""):
+            continue
+        rows.append((_humanise(k), _format_value(v)))
+
+    # Bridges: derive span info if span_layout is present.
     layout = spec.get("span_layout") or []
-    spans = [s.get("length_m", 0) for s in layout]
-    longest = max(spans) if spans else 0
-    rows = [
-        ("Bridge type", spec.get("bridge_type", "—")),
-        ("Total length", f"{spec.get('total_length_m', 0)} m"),
-        ("Number of spans", str(len(layout)) if layout else "—"),
-        ("Longest span", f"{longest} m"),
-        ("Deck width", f"{spec.get('deck_width_m', 0)} m"),
-        ("Lanes", str(spec.get("lanes", "—"))),
-        ("Design live load", f"{spec.get('design_live_load_kN_per_m', 0)} kN/m"),
-        ("Structural depth",
-         f"{spec.get('structural_depth_m', 0)} m"
-         if spec.get("structural_depth_m") else "—"),
-        ("Primary material", spec.get("primary_material", "—")),
-        ("Deck material", spec.get("deck_material", "—")),
-        ("Aesthetic style", spec.get("aesthetic_style", "—")),
-    ]
+    if layout:
+        spans = [s.get("length_m", 0) for s in layout]
+        rows.append(("Number of spans", str(len(layout))))
+        rows.append(("Longest span (m)", _format_value(max(spans))))
+
+    if not rows:
+        rows = [("Design", spec.get("design_type") or spec.get("bridge_type")
+                 or "(unspecified)")]
+
     md = ["| Property | Value |", "|---|---|"]
     md += [f"| {k} | {v} |" for k, v in rows]
     return "\n".join(md)
@@ -77,18 +139,25 @@ def _team_contributions_md(run_id: str) -> str:
 
 
 def build_report(run_id: str, prompt: str, spec: dict, validation: dict, cost: dict) -> str:
+    """Assemble the final markdown report and persist it as an artifact.
+
+    The report combines an LLM-generated introduction with deterministic
+    tables (bridge characteristics, validation outcome, cost roll-up,
+    per-subtask team contributions). Stored both as an ``artifacts`` row
+    of kind ``final_report_md`` and on the ``runs`` row directly.
+    """
     intro = chat(
         render("reporter", prompt=prompt, spec=spec, validation=validation, cost=cost),
         role="reporter",
     )
 
     md = (
-        f"# Conceptual Bridge Design Brief\n\n"
+        f"# Conceptual Design Brief\n\n"
         f"{DISCLAIMER}\n\n"
         f"**Run:** `{run_id}`  \n"
         f"**Prompt:** {prompt}\n\n"
         f"## Introduction\n{intro}\n\n"
-        f"## Final bridge characteristics\n{_bridge_characteristics_md(spec)}\n\n"
+        f"## Final design characteristics\n{_design_characteristics_md(spec)}\n\n"
         f"## Validation\n- Overall: **{validation['overall_status']}**\n"
         + "\n".join(f"  - {c['name']}: {c['status']}" for c in validation['checks'])
         + f"\n\n## Cost\n- Total: **{cost['total']:,} {cost['currency']}** "

@@ -1,11 +1,40 @@
 {
   "currency": "EUR",
+
   "structural_steel_per_tonne": 3500,
   "weathering_steel_per_tonne": 4000,
+  "stainless_steel_per_tonne": 6500,
+  "aluminium_per_tonne": 4200,
+  "rebar_per_tonne": 1200,
+  "cable_steel_per_tonne": 7000,
+
   "structural_concrete_per_m3": 180,
+  "high_strength_concrete_per_m3": 260,
+  "precast_concrete_per_m3": 320,
+  "masonry_per_m3": 220,
+  "stone_per_m3": 1100,
+  "timber_per_m3": 850,
+  "glulam_per_m3": 1600,
+
   "deck_slab_per_m2": 350,
+  "facade_glazing_per_m2": 900,
+  "curtain_wall_per_m2": 1200,
+  "roofing_membrane_per_m2": 90,
+  "tile_finish_per_m2": 120,
+  "asphalt_pavement_per_m2": 60,
+
+  "earthworks_per_m3": 35,
+  "piling_per_m": 450,
   "pier_each": 150000,
   "abutment_each": 220000,
+  "foundation_pad_each": 80000,
+
+  "mep_per_m2": 280,
+  "lighting_per_m": 90,
+  "drainage_per_m": 140,
+
+  "unspecified_material_per_unit": 1500,
+
   "finishing_premium_pct": 10,
   "contingency_pct": 15
 }

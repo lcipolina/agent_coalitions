@@ -1,6 +1,8 @@
-{# Synthesize design_specs JSON from all subtask outputs. #}
-You consolidate the results of all subtasks into a single conceptual bridge
-design specification.
+{# Synthesize a domain-agnostic conceptual design spec from subtask outputs. #}
+You consolidate the results of all subtasks into a single conceptual design
+specification. The user's design intent may be a bridge, building, tower,
+roller-coaster, pavilion, transport hub, public sculpture or any other
+structure — adapt the spec to the domain.
 
 User prompt:
 {{ prompt }}
@@ -12,6 +14,20 @@ Subtask summaries (in order):
 
 Output strict JSON in this exact shape (no markdown fences, no commentary):
 {
+  "design_type": "...",
+  "domain": "...",
+  "primary_material": "...",
+  "secondary_material": "...",
+  "aesthetic_style": "...",
+  "dimensions": {
+    "length_m": 0,
+    "width_m": 0,
+    "height_m": 0
+  },
+  "characteristics": {
+    "<snake_case_key>": "<value>"
+  },
+
   "bridge_type": "...",
   "span_layout": [{"length_m": 0, "supports": ["pier", "pier"]}],
   "total_length_m": 0,
@@ -19,13 +35,23 @@ Output strict JSON in this exact shape (no markdown fences, no commentary):
   "lanes": 0,
   "design_live_load_kN_per_m": 0,
   "structural_depth_m": 0,
-  "primary_material": "...",
-  "deck_material": "...",
-  "aesthetic_style": "..."
+  "deck_material": "..."
 }
 
-Rules:
-- Numbers must be plausible and internally consistent (sum of span lengths
-  ≈ total_length_m; lanes × 3.5 m ≤ deck_width_m).
-- Pick a primary_material consistent with the longest span.
-- Use snake_case lowercase for string enums (e.g. multi_span_cable_stayed).
+Field rules:
+- design_type: short snake_case typology (e.g. multi_span_cable_stayed_bridge,
+  steel_lattice_observation_tower, looping_steel_rollercoaster).
+- domain: one of bridge, building, tower, rollercoaster, pavilion, transport,
+  sculpture, other.
+- characteristics: 4-10 domain-relevant key/value facts (numbers or short
+  strings). Examples by domain:
+    * rollercoaster: track_length_m, max_height_m, num_inversions,
+      top_speed_kmh, ride_duration_s, theoretical_throughput_riders_per_h
+    * tower: total_height_m, footprint_m2, observation_levels, lift_count
+    * pavilion: floor_area_m2, roof_span_m, occupant_capacity, glazing_pct
+- Numbers must be plausible and internally consistent.
+- Use snake_case lowercase for all string enums.
+- The bridge-shaped fields (bridge_type, span_layout, total_length_m,
+  deck_width_m, lanes, design_live_load_kN_per_m, structural_depth_m,
+  deck_material) are REQUIRED when domain == "bridge". For other domains,
+  set bridge_type to "" and the numeric fields to 0 and span_layout to [].

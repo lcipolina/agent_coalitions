@@ -283,6 +283,12 @@ def _add_truss(fig: go.Figure, xs: list[float], y_deck: float,
 
 
 def render_bridge(spec: dict[str, Any]) -> go.Figure:
+    """Render a stylised side-elevation Plotly figure for a bridge ``spec``.
+
+    Adapts to ``spec['bridge_type']`` (cable-stayed, suspension, arch,
+    truss, or default girder). Proportions are exaggerated for legibility;
+    the figure is illustrative, not to scale.
+    """
     layout = spec.get("span_layout") or []
     L = spec.get("total_length_m") or sum(s.get("length_m", 0) for s in layout) or 1
     longest = max((s.get("length_m", 0) for s in layout), default=L)

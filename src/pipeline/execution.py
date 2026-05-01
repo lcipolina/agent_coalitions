@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 
 from src.agents.blackboard import post
-from src.agents.coalitions import CandidateSkill, form_coalition
+from src.agents.coalitions import CandidateSkill, form_coalition, shapley_values
 from src.db.client import get_db
 from src.db.writes import insert_with_event, log_event
 from src.llm.openai_client import chat, embed
@@ -61,11 +61,33 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
         kind="skill_search",
         payload={"subtask_id": subtask["subtask_id"], "n_candidates": len(seen)},
     )
-    return list(seen.values())[:15]
+    # Coverage floor: drop any candidate whose semantic similarity to the
+    # subtask query is below 0.30. Without this filter, a skill with a
+    # great prior_reputation/install count but a poor semantic match (e.g.
+    # ``propulsion-systems`` for a bridge subtask) can still slip into the
+    # team because β·prior_rep + γ·log(installs) compensates for the low
+    # α·coverage term. The floor enforces "must be at least loosely
+    # on-topic" before rep/installs get a vote.
+    COVERAGE_FLOOR = 0.30
+    filtered = [c for c in seen.values() if c.coverage >= COVERAGE_FLOOR]
+    # If the floor wipes out the candidate set entirely (very off-domain
+    # subtask), fall back to the top-k by coverage so the pipeline still
+    # makes progress instead of crashing.
+    if not filtered:
+        filtered = sorted(seen.values(), key=lambda c: c.coverage, reverse=True)[:5]
+    return filtered[:15]
 
 
 def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict],
                     criteria: list[dict] | None = None) -> dict:
+    """Run the full per-subtask loop and return the persisted output doc.
+
+    Pipeline:
+      1. retrieve candidate skills via vector search
+      2. form a coalition of skills + cover them with agents
+      3. round 0 marshal kickoff → round 1 agents → round 2 marshal reconcile
+      4. write the assignment, blackboard messages and ``subtask_outputs`` row
+    """
     db = get_db()
     db.subtasks.update_one(
         {"run_id": run_id, "subtask_id": subtask["subtask_id"]},
@@ -78,24 +100,42 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict],
     })
     coalition, rationale = form_coalition(candidates)
     coalition_skill_ids = [c.skill_id for c in coalition]
+    solo_by_skill = {c.skill_id: float(c.solo) for c in coalition}
+    # Exact Shapley value per skill in the chosen team (induced-subgraph
+    # closed form: φ_i = a_i + ½·Σ w_ij). O(k²), k≤3, so essentially free.
+    shapley_by_skill = shapley_values(coalition)
     agents = cover_skills_with_agents(coalition_skill_ids, max_agents=3)
     coalition_agent_ids = [a["agent_id"] for a in agents] or [MARSHAL_ID]
 
+    # Build the per-agent contribution table by iterating over the agents
+    # the set-cover step actually returned. Each agent gets the slice of the
+    # coalition's skills it can supply (minus skills already claimed by an
+    # earlier agent). The agent's `score` is the sum of solo values for
+    # those skills; `shapley` is the sum of exact Shapley values for the
+    # same skills (fair-credit share that accounts for complementarity
+    # with the rest of the team).
     contribution_scores = []
     covered: set[str] = set()
-    for a, c in zip(agents, coalition):
-        contributed = sorted(set(a["skill_ids"]) & set(coalition_skill_ids) - covered)
+    for a in agents:
+        contributed = sorted(
+            (set(a["skill_ids"]) & set(coalition_skill_ids)) - covered
+        )
         covered.update(contributed)
+        score = sum(solo_by_skill.get(s, 0.0) for s in contributed)
+        shap = sum(shapley_by_skill.get(s, 0.0) for s in contributed)
         contribution_scores.append({
             "agent_id": a["agent_id"],
-            "score": float(c.solo),
+            "score": float(score),
+            "shapley": float(shap),
             "skills_contributed": contributed,
         })
 
     emit("coalition_formed", {
         "subtask_id": subtask["subtask_id"],
         "skills": [
-            {"skill_id": c.skill_id, "name": c.name, "solo": float(c.solo)}
+            {"skill_id": c.skill_id, "name": c.name,
+             "solo": float(c.solo),
+             "shapley": float(shapley_by_skill.get(c.skill_id, 0.0))}
             for c in coalition
         ],
         "agents": contribution_scores,

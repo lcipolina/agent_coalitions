@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 
 
 def _check_span_to_depth(spec: dict) -> dict:
+    """Bridge slenderness check: span/depth in [8,18] pass, [4,30] warn, else fail."""
     span = max((s["length_m"] for s in spec.get("span_layout", []) or [{"length_m": 0}]),
                default=0)
     # Conservative default depth = span/12 if not provided.
@@ -42,6 +43,7 @@ def _check_span_to_depth(spec: dict) -> dict:
 
 
 def _check_support_count(spec: dict) -> dict:
+    """Verify ``n_supports == n_spans + 1`` and that span lengths sum to total."""
     layout = spec.get("span_layout") or []
     n_supports = spec.get("n_supports", len(layout) + 1)
     sum_lengths = sum(s["length_m"] for s in layout)
@@ -55,6 +57,7 @@ def _check_support_count(spec: dict) -> dict:
 
 
 def _check_live_load(spec: dict) -> dict:
+    """Bound the gross live-load envelope ``q*w*L`` to plausible bridge magnitudes."""
     q = spec.get("design_live_load_kN_per_m", 0)
     w = spec.get("deck_width_m", 0)
     L = spec.get("total_length_m", 0)
@@ -68,6 +71,7 @@ def _check_live_load(spec: dict) -> dict:
 
 
 def _check_material_span(spec: dict) -> dict:
+    """Reject materially-impossible primary systems (e.g. timber > 120 m)."""
     primary = spec.get("primary_material", "")
     max_span = max((s["length_m"] for s in spec.get("span_layout", []) or [{"length_m": 0}]),
                    default=0)
@@ -84,6 +88,7 @@ def _check_material_span(spec: dict) -> dict:
 
 
 def _check_lane_geometry(spec: dict) -> dict:
+    """Require deck width ≥ 3.5 m per lane (code-minimum lane width)."""
     lanes = spec.get("lanes", 0)
     width = spec.get("deck_width_m", 0)
     needed = lanes * 3.5
@@ -94,6 +99,7 @@ def _check_lane_geometry(spec: dict) -> dict:
 
 
 def _overall(checks: list[dict]) -> str:
+    """Aggregate per-check statuses into the overall run validation status."""
     statuses = {c["status"] for c in checks}
     if "fail" in statuses:
         return "conceptual_fail"
@@ -116,24 +122,34 @@ def _resolve_field(spec: dict, path: str) -> Any:
     """
     if path == "span_to_depth_ratio":
         layout = spec.get("span_layout") or []
+        if not layout or not spec.get("structural_depth_m"):
+            return None
         span = max((s.get("length_m", 0) for s in layout), default=0)
         depth = spec.get("structural_depth_m") or max(span / 12.0, 1.0)
         return span / depth if depth > 0 else 0
     if path == "support_count_consistent":
         layout = spec.get("span_layout") or []
+        if not layout:
+            return None
         n_supports = spec.get("n_supports", len(layout) + 1)
         sum_l = sum(s.get("length_m", 0) for s in layout)
         total = spec.get("total_length_m", sum_l)
         return ((len(layout) + 1) == n_supports
                 and abs(sum_l - total) <= 0.02 * max(total, 1))
     if path == "live_load_total_kN":
+        if not (spec.get("design_live_load_kN_per_m")
+                and spec.get("deck_width_m")
+                and spec.get("total_length_m")):
+            return None
         return (spec.get("design_live_load_kN_per_m", 0)
                 * spec.get("deck_width_m", 0)
                 * spec.get("total_length_m", 0))
     if path == "deck_width_per_lane_m":
         lanes = spec.get("lanes", 0) or 0
         width = spec.get("deck_width_m", 0) or 0
-        return width / lanes if lanes else 0
+        if not lanes or not width:
+            return None
+        return width / lanes
 
     cur: Any = spec
     for part in path.split("."):
@@ -155,6 +171,16 @@ def _evaluate_criterion(criterion: dict, spec: dict) -> dict:
     field = check.get("spec_field")
     target = check.get("value")
     actual = _resolve_field(spec, field)
+    # If the criterion targets a field this domain's spec doesn't have,
+    # demote to "qualitative" rather than failing — a rollercoaster spec
+    # has no `span_to_depth_ratio`, but that doesn't mean the design is
+    # bad; it means the criterion doesn't apply.
+    if op != "present" and actual in (None, "", [], {}):
+        return {"name": cid, "status": "qualitative",
+                "value": {"actual": None,
+                          "expected": {"op": op, "value": target},
+                          "field": field},
+                "note": f"{name} (field not present in spec)"}
     status = "fail"
     try:
         if op == "lte":
@@ -185,6 +211,12 @@ def _evaluate_criterion(criterion: dict, spec: dict) -> dict:
 
 
 def validate(run_id: str, spec: dict) -> dict:
+    """Evaluate the run's criteria against ``spec`` and persist the result.
+
+    Combines structured criterion checks (with overall status aggregated
+    over the quantitative ones only) with a per-subtask LLM judge pass
+    rating clarity / completeness / consistency.
+    """
     db = get_db()
     run_doc = db.runs.find_one({"run_id": run_id}, {"_id": 0, "validation_spec": 1})
     val_spec = (run_doc or {}).get("validation_spec") or {"criteria": []}
@@ -202,9 +234,26 @@ def validate(run_id: str, spec: dict) -> dict:
             render("judge", subtask_id=o["subtask_id"], summary=o["summary"]),
             role="judge", subtask_id=o["subtask_id"],
         )
+        # Strip markdown code fences (```json ... ```) the LLM sometimes adds.
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
         try:
-            data = json.loads(raw)
+            data = json.loads(cleaned)
+            # Coerce required fields to expected types.
+            data = {
+                "subtask_id": str(data.get("subtask_id", o["subtask_id"])),
+                "clarity": int(data.get("clarity", 5)),
+                "completeness": int(data.get("completeness", 5)),
+                "consistency": int(data.get("consistency", 5)),
+                "rationale": str(data.get("rationale", ""))[:500],
+            }
         except Exception:  # noqa: BLE001
+            log.warning("judge JSON parse failed for %s; raw=%r",
+                        o["subtask_id"], raw[:200])
             data = {"subtask_id": o["subtask_id"],
                     "clarity": 5, "completeness": 5, "consistency": 5,
                     "rationale": "judge JSON parse failed"}

@@ -31,6 +31,11 @@ _listener: Callable[[str, dict[str, Any]], None] | None = None
 
 
 def emit(kind: str, info: dict[str, Any] | None = None) -> None:
+    """Forward a progress event to the installed listener (no-op if none).
+
+    Listener exceptions are swallowed so a failing UI never crashes the
+    pipeline.
+    """
     if _listener is None:
         return
     try:
@@ -43,6 +48,7 @@ def emit(kind: str, info: dict[str, Any] | None = None) -> None:
 def set_listener(
     fn: Callable[[str, dict[str, Any]], None] | None,
 ) -> Iterator[None]:
+    """Install ``fn`` as the global progress listener for the duration of the block."""
     global _listener
     prev = _listener
     _listener = fn

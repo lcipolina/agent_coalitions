@@ -29,15 +29,24 @@ log = logging.getLogger(__name__)
 
 _call_counter = 0
 _lock = Lock()
+# Process-local cache of embeddings keyed on (model, text). Embedding the
+# same string twice in a single run is wasteful and is a common pattern
+# (e.g. coalition formation embeds each capability and search_skills
+# embeds the same string a moment later). Cache hits do not bump the
+# call counter, keeping G9 honest.
+_embed_cache: dict[tuple[str, str], list[float]] = {}
 
 
 def reset_counter() -> None:
+    """Reset the process-local LLM call counter to 0 (used by replay)."""
     global _call_counter
     with _lock:
         _call_counter = 0
+        _embed_cache.clear()
 
 
 def call_counter() -> int:
+    """Return the current LLM call count (G9 replay invariant)."""
     return _call_counter
 
 
@@ -74,16 +83,33 @@ def _embedding_client():
 
 
 def embed(text: str) -> list[float]:
+    """Return an embedding for ``text`` (mocked when ``USE_MOCK_LLM=true``).
+
+    Real-mode results are cached per-process on (model, text) so the same
+    string is only embedded once.
+    """
     if settings.use_mock_llm:
         return _mock.embed(text)
+    key = (settings.openai_embedding_model, text)
+    cached = _embed_cache.get(key)
+    if cached is not None:
+        return cached
     _bump()
     resp = _embedding_client().embeddings.create(
         model=settings.openai_embedding_model, input=text
     )
-    return resp.data[0].embedding
+    vec = resp.data[0].embedding
+    _embed_cache[key] = vec
+    return vec
 
 
 def chat(prompt: str, role: str = "agent", **kwargs: Any) -> str:
+    """Run a chat completion (mocked when ``USE_MOCK_LLM=true``).
+
+    ``role`` is forwarded to the mock router so each pipeline stage gets a
+    role-appropriate stub; in real mode it is unused (a single user-message
+    completion is sent).
+    """
     if settings.use_mock_llm:
         return _mock.chat(prompt, role=role, **kwargs)
     _bump()

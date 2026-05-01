@@ -25,6 +25,7 @@ def log_event(
     *,
     db: Database | None = None,
 ) -> None:
+    """Insert a single ``events`` row tagged with ``run_id`` and ``kind``."""
     db = db if db is not None else get_db()
     db.events.insert_one(
         {"run_id": run_id, "ts": _now(), "kind": kind, "payload": payload or {}}

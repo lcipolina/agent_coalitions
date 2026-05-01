@@ -234,6 +234,199 @@ def _bridge_primitives(spec: dict[str, Any]) -> dict[str, Any]:
     return geometry
 
 
+def _generic_primitives(spec: dict[str, Any]) -> dict[str, Any]:
+    """Domain-agnostic geometry fallback for non-bridge specs.
+
+    Produces a coarse but legible 3D massing study from the spec's
+    ``dimensions`` (length × width × height), plus a couple of vertical
+    members and a ground plane. Used when the spec is clearly not a
+    bridge and the LLM path is unavailable or fails.
+    """
+    dims = spec.get("dimensions") or {}
+    L = float(dims.get("length_m") or 100.0)
+    W = float(dims.get("width_m") or 20.0)
+    H = float(dims.get("height_m") or 30.0)
+    domain = (spec.get("domain") or "").lower()
+    dtype = (spec.get("design_type") or "").lower()
+
+    prims: list[dict[str, Any]] = []
+    # Ground plane.
+    prims.append(_box(-L * 0.1, L * 1.1, -W * 1.5, W * 1.5,
+                      -0.3, 0.0, "rgba(110,150,110,0.35)", "ground"))
+
+    if "rollercoaster" in domain or "coaster" in dtype or "rollercoaster" in dtype:
+        # Track recipe: long horizontal sweep with one big hill, one true
+        # vertical loop-the-loop and one helical curve in plan. The loop
+        # is a circle in the x-z plane; we trace x = xc + R*sin(t),
+        # z = zc + R*(1 - cos(t)) so the rail leaves the ground tangentially
+        # at t=0, peaks at t=pi above the ground, and rejoins at t=2pi.
+        import math
+        rail_offset = 0.6
+        # Loop geometry. Pin the loop's lowest point to z = 1.5 so the
+        # rail enters tangentially from track level instead of dipping
+        # below the ground plane.
+        loop_R = max(min(H * 0.40, L * 0.10), 6.0)
+        loop_xc = L * 0.50
+        loop_zc = loop_R + 1.5
+        # Sample positions along the track.
+        # Phase 0 [0..0.30]: lift hill (climbs from ~0 to H*0.85, then
+        #                     dives back to H*0.20) along x in [0, 0.30 L].
+        # Phase 1 [0.30..0.50]: straight approach into the loop.
+        # Phase 2 [loop]:       full vertical circle around (loop_xc, loop_zc).
+        # Phase 3 [0.55..0.80]: helical S-curve back along x.
+        # Phase 4 [0.80..1.0]:  brake run into station.
+        track: list[tuple[float, float, float]] = []
+        # Phase 0 — hill.
+        for k in range(60):
+            u = k / 59
+            x = u * L * 0.30
+            z = H * 0.85 * math.sin(u * math.pi)        # up then down
+            y = W * 0.20 * math.sin(u * math.pi * 0.5)
+            track.append((x, y, max(z, 1.5)))
+        # Phase 1 — straight approach.
+        approach_z = max(loop_zc - loop_R + 1.5, 1.5)
+        for k in range(20):
+            u = k / 19
+            x = L * 0.30 + u * (loop_xc - loop_R - L * 0.30)
+            track.append((x, 0.0, approach_z))
+        # Phase 2 — true vertical loop in x-z plane.
+        for k in range(72):
+            t = (k / 71) * 2 * math.pi
+            x = loop_xc - loop_R * math.cos(t)            # enters from -x side
+            z = loop_zc + loop_R * math.sin(t)
+            # Lift the loop slightly so it never dips below ground.
+            track.append((x, 0.0, max(z, 1.5)))
+        # Phase 3 — helical S-curve.
+        x_start = loop_xc + loop_R
+        x_end = L * 0.85
+        for k in range(60):
+            u = k / 59
+            x = x_start + u * (x_end - x_start)
+            y = W * 0.45 * math.sin(u * math.pi * 2)       # weave left-right
+            z = H * 0.35 + H * 0.20 * math.cos(u * math.pi * 3)
+            track.append((x, y, max(z, 1.5)))
+        # Phase 4 — brake run / return to station.
+        for k in range(30):
+            u = k / 29
+            x = x_end + u * (L - x_end)
+            y = W * 0.45 * (1 - u) * math.cos(u * math.pi)
+            z = max(H * 0.10 * (1 - u) + 1.5, 1.5)
+            track.append((x, y, z))
+        # Twin rails: offset in y perpendicular to the local tangent so the
+        # two rails always sit either side of the centreline.
+        for sign in (-1.0, 1.0):
+            pts: list[list[float]] = []
+            for i, (x, y, z) in enumerate(track):
+                # Local tangent in x-y plane.
+                if i + 1 < len(track):
+                    dx = track[i + 1][0] - x
+                    dy = track[i + 1][1] - y
+                else:
+                    dx = x - track[i - 1][0]
+                    dy = y - track[i - 1][1]
+                norm = math.hypot(dx, dy) or 1.0
+                # Perpendicular in plan = (-dy, dx) / norm.
+                ox = -dy / norm * rail_offset * sign
+                oy = dx / norm * rail_offset * sign
+                pts.append([x + ox, y + oy, z])
+            prims.append(_line(pts, "#c0392b", 4.0, f"rail_{int(sign)}"))
+        # Crossties every ~6 m of arc length (visual "ladder rungs").
+        # Step through the centreline track and drop a small box bridging
+        # the two rails.
+        for i in range(0, len(track), 4):
+            x, y, z = track[i]
+            if i + 1 < len(track):
+                dx = track[i + 1][0] - x
+                dy = track[i + 1][1] - y
+            else:
+                continue
+            norm = math.hypot(dx, dy) or 1.0
+            ox = -dy / norm * rail_offset
+            oy = dx / norm * rail_offset
+            prims.append(_box(min(x - ox, x + ox) - 0.1,
+                              max(x - ox, x + ox) + 0.1,
+                              min(y - oy, y + oy) - 0.1,
+                              max(y - oy, y + oy) + 0.1,
+                              z - 0.15, z + 0.15,
+                              "#7d3c0e", f"tie_{i}"))
+        # Support columns roughly every 25 m of x along the lift hill and
+        # brake run (skip the loop interior so columns don't pierce the
+        # vertical circle).
+        for xc in range(20, int(L) - 5, 25):
+            # Skip near the loop.
+            if abs(xc - loop_xc) < loop_R * 1.1:
+                continue
+            # Find nearest track point above this xc to size the column.
+            zc = max(
+                (z for (x, _y, z) in track if abs(x - xc) < 6),
+                default=H * 0.4,
+            )
+            prims.append(_box(xc - 0.6, xc + 0.6, -0.6, 0.6,
+                              0.0, max(zc - 0.5, 2.0),
+                              "#7a7a7a", f"support_{xc}"))
+        # Station building.
+        prims.append(_box(0.0, L * 0.08, -W * 0.4, W * 0.4,
+                          0.0, H * 0.25, "#34495e", "station"))
+        title = (f"{(spec.get('design_type') or 'rollercoaster').replace('_', ' ')}"
+                 f" · {int(L)} m track · {int(H)} m max height")
+    elif "tower" in domain or "tower" in dtype or "skyscraper" in dtype \
+            or "building" in domain or "building" in dtype:
+        # Stacked floor-plates with a vertical core.
+        floors = max(int(H // 4), 1)
+        for f in range(floors):
+            z0 = f * H / floors
+            z1 = (f + 1) * H / floors
+            colour = "#566573" if f % 2 == 0 else "#34495e"
+            prims.append(_box(-W / 2, W / 2, -W / 2, W / 2,
+                              z0, z1, colour, f"floor_{f + 1}"))
+        # Core.
+        prims.append(_box(-W * 0.12, W * 0.12, -W * 0.12, W * 0.12,
+                          0.0, H, "#1c2833", "core"))
+        title = (f"{(spec.get('design_type') or 'tower').replace('_', ' ')} · "
+                 f"{int(H)} m tall · {int(W)} m × {int(W)} m footprint")
+    elif "pavilion" in domain or "pavilion" in dtype:
+        # Wide low pavilion: a roof box on slim columns.
+        roof_t = max(H * 0.08, 0.6)
+        prims.append(_box(0.0, L, -W / 2, W / 2,
+                          H - roof_t, H, "#d4a574", "roof"))
+        # Columns at corners + midpoints.
+        for xc in (L * 0.05, L * 0.5, L * 0.95):
+            for yc in (-W * 0.4, W * 0.4):
+                prims.append(_box(xc - 0.4, xc + 0.4, yc - 0.4, yc + 0.4,
+                                  0.0, H - roof_t, "#7a7a7a",
+                                  f"column_{int(xc)}_{int(yc)}"))
+        title = (f"{(spec.get('design_type') or 'pavilion').replace('_', ' ')} · "
+                 f"{int(L)} m × {int(W)} m · {int(H)} m roof")
+    else:
+        # Generic massing block.
+        prims.append(_box(0.0, L, -W / 2, W / 2,
+                          0.0, H, "#7f8c8d", "mass"))
+        title = (f"{(spec.get('design_type') or 'structure').replace('_', ' ')} · "
+                 f"{int(L)} × {int(W)} × {int(H)} m envelope")
+
+    return {
+        "primitives": prims,
+        "title": title,
+        "axes": {"x": "length (m)", "y": "width (m)", "z": "height (m)"},
+        "extent": {"x": [0.0, L], "y": [-W, W], "z": [-1.0, H * 1.2]},
+    }
+
+
+def _spec_looks_like_bridge(spec: dict[str, Any]) -> bool:
+    keys = {"span_layout", "deck_width_m", "bridge_type",
+            "total_length_m", "design_live_load_kN_per_m"}
+    has_keys = sum(1 for k in keys if spec.get(k))
+    domain = (spec.get("domain") or "").lower()
+    return domain == "bridge" or has_keys >= 3
+
+
+def _deterministic_primitives(spec: dict[str, Any]) -> dict[str, Any]:
+    """Dispatch deterministic geometry on whether the spec is a bridge."""
+    if _spec_looks_like_bridge(spec):
+        return _bridge_primitives(spec)
+    return _generic_primitives(spec)
+
+
 # ---------------------------------------------------------------------------
 # LLM path
 # ---------------------------------------------------------------------------
@@ -304,8 +497,12 @@ def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
                       deterministic and log a warning.
     """
     source: str
-    if settings.use_mock_llm:
-        geometry = _bridge_primitives(spec)
+    is_bridge = _spec_looks_like_bridge(spec)
+    if settings.use_mock_llm or not is_bridge:
+        # Deterministic recipes produce far more legible non-bridge
+        # geometry (curved rollercoaster rails, stacked floors, etc.)
+        # than free-form LLM box-piles. Only let the LLM draw bridges.
+        geometry = _deterministic_primitives(spec)
         source = "deterministic"
     else:
         try:
@@ -314,7 +511,7 @@ def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001 - any LLM failure is recoverable
             log.warning("visualiser LLM failed (%s); using deterministic fallback",
                         exc)
-            geometry = _bridge_primitives(spec)
+            geometry = _deterministic_primitives(spec)
             source = "deterministic_fallback"
     geometry["source"] = source
 

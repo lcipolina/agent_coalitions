@@ -18,31 +18,31 @@ log = logging.getLogger(__name__)
 
 
 # Fallback DAG used when (a) we are in mock mode, or (b) the LLM JSON parse
-# fails twice. Kept in sync with src/llm/mock.py::_decomposer so mock and
-# fallback agree.
+# fails twice. Domain-agnostic so that a non-bridge prompt that hits the
+# fallback still produces sensible-looking subtasks.
 FALLBACK_DAG: list[dict[str, Any]] = [
     {"subtask_id": "T1", "title": "Site & geometry",
-     "description": "Banks, alignment, span layout, approach grades.",
-     "required_capabilities": ["site planning", "geometry", "alignment"],
+     "description": "Site context, overall extents, layout and approach.",
+     "required_capabilities": ["site planning", "geometry", "spatial layout"],
      "depends_on": []},
-    {"subtask_id": "T2", "title": "Load profile",
-     "description": "Live, dead, dynamic, wind and seismic loading.",
-     "required_capabilities": ["traffic load modelling", "structural load estimation"],
+    {"subtask_id": "T2", "title": "Use & load profile",
+     "description": "Occupancy / traffic / live, dead, dynamic, wind and seismic loading.",
+     "required_capabilities": ["load modelling", "structural load estimation"],
      "depends_on": []},
     {"subtask_id": "T3", "title": "Material selection",
-     "description": "Primary structural material balancing cost, durability, aesthetic.",
+     "description": "Primary material balancing cost, durability and aesthetic.",
      "required_capabilities": ["materials science", "cost analysis", "constructability"],
      "depends_on": ["T1", "T2"]},
-    {"subtask_id": "T4", "title": "Structural system",
-     "description": "Truss / cable-stayed / arch system; member sizing.",
-     "required_capabilities": ["structural steel design", "cable-stayed bridges", "truss bridges"],
+    {"subtask_id": "T4", "title": "Primary structural system",
+     "description": "Choice of structural / functional system and member sizing.",
+     "required_capabilities": ["structural design", "system selection"],
      "depends_on": ["T1", "T2", "T3"]},
-    {"subtask_id": "T5", "title": "Aesthetic & elevation guidance",
-     "description": "Form, proportions, lighting, elevation rendering inputs.",
-     "required_capabilities": ["architectural aesthetics", "elevation rendering"],
+    {"subtask_id": "T5", "title": "Aesthetic & user experience",
+     "description": "Form, proportions, lighting, finishes and the experiential brief.",
+     "required_capabilities": ["architectural aesthetics", "experience design"],
      "depends_on": ["T1", "T4"]},
     {"subtask_id": "T6", "title": "Validation prep",
-     "description": "Inputs to deterministic checks: span/depth, lane geometry, load arithmetic.",
+     "description": "Inputs to deterministic checks (geometry consistency, code limits, arithmetic).",
      "required_capabilities": ["numerical validation", "applied mathematics"],
      "depends_on": ["T3", "T4"]},
     {"subtask_id": "T7", "title": "Final synthesis brief",
@@ -68,6 +68,13 @@ def _validate_dag(subtasks: list[dict[str, Any]]) -> bool:
 
 
 def decompose(run_id: str, prompt: str) -> list[dict[str, Any]]:
+    """Produce a 5–8 subtask DAG for ``prompt`` and persist it to ``subtasks``.
+
+    Tries the LLM decomposer first, falls back to :data:`FALLBACK_DAG` on
+    parse / validation failure or in mock mode (where the mock chat returns
+    the same DAG as JSON anyway). Each subtask is written with its
+    topological index so downstream stages can iterate in dependency order.
+    """
     try:
         raw = chat(render("decomposer", prompt=prompt), role="decomposer")
         data = json.loads(raw)

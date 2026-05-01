@@ -15,6 +15,7 @@ from src.pipeline.orchestrator import replay, run_pipeline
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point: dispatch to ``run_pipeline`` or ``replay``."""
     p = argparse.ArgumentParser()
     p.add_argument("--prompt", help="user design prompt")
     p.add_argument("--replay", help="run_id to replay (no LLM calls)")

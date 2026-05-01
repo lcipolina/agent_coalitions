@@ -68,15 +68,49 @@ def coalition_value(coalition: Sequence[CandidateSkill]) -> float:
     return total
 
 
+def shapley_values(coalition: Sequence[CandidateSkill]) -> dict[str, float]:
+    """Exact Shapley value for the induced-subgraph game (Deng-Papadimitriou).
+
+    For ``v(S) = Σ_{i∈S} a_i + Σ_{i<j, i,j∈S} w_ij`` the Shapley value of
+    player ``i`` collapses to the closed form
+
+        φ_i  =  a_i  +  ½ · Σ_{j ≠ i} w_ij
+
+    with ``a_i = c.solo`` and ``w_ij = λ · (1 − cos(e_i, e_j))``. O(k²) for
+    coalition size ``k`` — trivial cost compared to any LLM call.
+    """
+    out: dict[str, float] = {}
+    n = len(coalition)
+    for i in range(n):
+        ci = coalition[i]
+        edge_sum = 0.0
+        for j in range(n):
+            if i == j:
+                continue
+            edge_sum += LAMBDA * (1.0 - _cos(ci.embedding, coalition[j].embedding))
+        out[ci.skill_id] = float(ci.solo + 0.5 * edge_sum)
+    return out
+
+
 def form_coalition(
     candidates: list[CandidateSkill],
     *,
     max_size: int = MAX_COALITION,
     tau: float = TAU,
 ) -> tuple[list[CandidateSkill], str]:
+    """Greedily build a coalition of up to ``max_size`` skills.
+
+    Seeded by the highest solo-value skill, then iteratively adds the
+    candidate with the largest marginal contribution to ``coalition_value``
+    until either ``max_size`` is hit or the best marginal falls below
+    ``tau``. Returns the chosen coalition plus a short rationale string
+    describing each pick (used in the UI / persisted to assignments).
+    """
     if not candidates:
         return [], "no candidates"
 
+    # Pre-normalise the γ-installs term so its contribution lies in [0,1]
+    # regardless of the largest weekly_installs value in the candidate set.
     # Pre-normalise gamma so γ-term ∈ [0,1].
     max_log = max(math.log(1 + c.weekly_installs) for c in candidates) or 1.0
     for c in candidates:
@@ -88,6 +122,11 @@ def form_coalition(
         f"Seed: {coalition[0].skill_id} (solo={coalition[0].solo:.3f})."
     ]
 
+    # ----- Greedy growth loop -----
+    # At each step, score every remaining candidate by the marginal value
+    # it would add to the current coalition, and pick the best — provided
+    # the marginal exceeds τ. Stops early on a weak marginal so we don't
+    # pad the coalition with low-signal skills.
     pool = [c for c in candidates if c.skill_id != coalition[0].skill_id]
     while len(coalition) < max_size and pool:
         best, best_marginal = None, -1.0

@@ -13,10 +13,12 @@ def _enc():
 
 
 def count_tokens(text: str) -> int:
+    """Return the number of cl100k_base tokens in ``text``."""
     return len(_enc().encode(text))
 
 
 def truncate_to_tokens(text: str, max_tokens: int = SUBTASK_OUTPUT_TOKEN_CAP) -> str:
+    """Decode-truncate ``text`` so its token count is at most ``max_tokens``."""
     enc = _enc()
     ids = enc.encode(text)
     if len(ids) <= max_tokens:

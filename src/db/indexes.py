@@ -17,6 +17,7 @@ VECTOR_DIMENSIONS = 1536  # text-embedding-3-small
 
 
 def ensure_collections(db: Database) -> None:
+    """Create any missing collections from :data:`COLLECTIONS` (idempotent)."""
     existing = set(db.list_collection_names())
     for name in COLLECTIONS:
         if name not in existing:
@@ -24,6 +25,7 @@ def ensure_collections(db: Database) -> None:
 
 
 def ensure_regular_indexes(db: Database) -> None:
+    """Create the regular B-tree indexes per MVP_DESIGN §3 (idempotent)."""
     db.skills.create_index([("category", ASCENDING)])
     db.skills.create_index([("weekly_installs", ASCENDING)])
     db.skills.create_index([("skill_id", ASCENDING)], unique=True)
@@ -89,6 +91,7 @@ def ensure_vector_index(db: Database) -> bool:
 
 
 def ensure_all() -> dict[str, bool]:
+    """Run all idempotent index/collection bootstrap steps; return a status dict."""
     db = get_db()
     ensure_collections(db)
     ensure_regular_indexes(db)

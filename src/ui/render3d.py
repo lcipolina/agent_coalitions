@@ -59,6 +59,7 @@ def _line_trace(p: dict[str, Any]) -> go.Scatter3d:
 
 
 def render_geometry(geometry: dict[str, Any]) -> go.Figure:
+    """Build a Plotly figure from a geometry artifact (boxes + polylines)."""
     fig = go.Figure()
     for prim in geometry.get("primitives", []):
         kind = prim.get("kind")

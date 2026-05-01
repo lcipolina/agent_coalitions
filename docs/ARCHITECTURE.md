@@ -157,16 +157,11 @@ flowchart LR
 ---
 
 
-## 2. Why MongoDB Atlas, and which parts are real
+## 2. Why MongoDB Atlas.
 
-**MongoDB Atlas is real.** All thirteen domain collections (`runs`, `subtasks`, `assignments`, `coalition_messages`, `subtask_outputs`, `design_specs`, `validation_results`, `cost_estimates`, `artifacts`, `agents`, `skills`, `reputation_updates`, `events`) are live, hosted on an M10 cluster in `eu-west-2`, indexed and exercised on every run.
+**MongoDB Atlas is used.** All thirteen domain collections (`runs`, `subtasks`, `assignments`, `coalition_messages`, `subtask_outputs`, `design_specs`, `validation_results`, `cost_estimates`, `artifacts`, `agents`, `skills`, `reputation_updates`, `events`) are live, hosted on an M10 cluster in `eu-west-2`, indexed and exercised on every run.
 
-The only things that can be mocked in this system are:
 
-- the **chat LLM** (decomposer, marshal, agent contributions, synthesiser, judge, surveyor narrative, reporter introduction), and
-- the **embedding model** used to build query vectors at retrieval time.
-
-Both are gated by a single environment flag: `USE_MOCK_LLM`. When mocked, Atlas Vector Search still runs end-to-end against the real index — the only difference is that the query vector is a deterministic SHA-256-seeded pseudo-embedding rather than an OpenAI embedding. This means the demo runs entirely offline (in <5 seconds) without compromising the MongoDB story: the database, the vector index, the writes, the queries, and the replay path are exactly what they will be in production.
 
 Decision rationale:
 

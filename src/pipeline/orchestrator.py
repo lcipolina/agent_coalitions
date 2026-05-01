@@ -94,6 +94,11 @@ def _upstream_outputs(run_id: str, subtask: dict) -> list[dict]:
 
 
 def run_pipeline(prompt: str) -> dict[str, Any]:
+    """Run the full 9-stage pipeline for ``prompt`` and return a summary dict.
+
+    Each stage writes its own MongoDB rows (and ≥ 1 ``events`` row, per G6).
+    Progress hints are emitted via :mod:`src.core.progress` for live UIs.
+    """
     run_id = _ensure_run(prompt)
     log.info("pipeline run_id=%s prompt=%r", run_id, prompt)
     emit("pipeline_start", {"prompt": prompt, "run_id": run_id})

@@ -21,6 +21,7 @@ def post(
     text: str,
     meta: dict[str, Any] | None = None,
 ) -> None:
+    """Insert a single coalition message and emit a paired ``message_posted`` event."""
     db = get_db()
     db.coalition_messages.insert_one({
         "run_id": run_id,
@@ -37,6 +38,7 @@ def post(
 
 
 def read(run_id: str, subtask_id: str, *, max_round: int | None = None) -> list[dict]:
+    """Return coalition messages for one subtask, optionally capped at ``max_round``."""
     q: dict[str, Any] = {"run_id": run_id, "subtask_id": subtask_id}
     if max_round is not None:
         q["round"] = {"$lte": max_round}
@@ -44,6 +46,7 @@ def read(run_id: str, subtask_id: str, *, max_round: int | None = None) -> list[
 
 
 def render_log(run_id: str, subtask_id: str) -> str:
+    """Render the full message log for a subtask as a single human-readable string."""
     rows = read(run_id, subtask_id)
     return "\n".join(
         f"[r{r['round']} {r['role']}:{r['sender']}] {r['text']}" for r in rows
