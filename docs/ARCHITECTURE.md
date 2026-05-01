@@ -26,6 +26,137 @@ The pipeline is also **replayable**: given a `run_id`, the orchestrator can re-r
 
 ---
 
+## 1b. System design at a glance
+
+Four diagrams, each capturing one design axis: **components**, **pipeline dataflow**, **data model**, and the **mock/real flag**. They are reference material for the longer sections that follow; nothing in them is novel — they just make the cross-cutting structure visible on one screen.
+
+### Component view
+
+The system is six packages, each with a single concern. The UI talks only to the orchestrator and to MongoDB (read-only on replay); the orchestrator owns every write through a thin `db/` write layer.
+
+```mermaid
+flowchart LR
+    subgraph UI["Streamlit UI (app.py)"]
+        TABS["Tabs: Plan · Coalitions · Blackboard ·\nSpec · Validation · Cost · Rendering · Report"]
+    end
+
+    subgraph PIPE["src/pipeline (orchestrator + 9 stages)"]
+        ORCH["orchestrator.run_pipeline()"]
+        DEC["decomposer"]
+        VSPEC["validator_spec"]
+        EXEC["execution"]
+        SYN["synthesis"]
+        VAL["validation"]
+        SURV["surveyor (cost)"]
+        VIZ["visualiser"]
+        REP["reporter"]
+        REPU["reputation"]
+    end
+
+    subgraph AG["src/agents (coalition mechanics)"]
+        COAL["coalitions\n(rank-1 Shapley + pairwise)"]
+        SC["set_cover\n(skill -> agents)"]
+        BB["blackboard"]
+        MARSH["marshal\n(round 0 / round 2)"]
+    end
+
+    subgraph LLM["src/llm"]
+        CHAT["openai_client.chat / embed"]
+        MOCK["mock (role-keyed)"]
+        TPL["prompts (Jinja2)"]
+    end
+
+    subgraph DB["src/db"]
+        WRITES["writes.insert_with_event"]
+        MATCH["matching ($vectorSearch)"]
+    end
+
+    subgraph ATLAS[("MongoDB Atlas (M10, eu-west-2)\n13 collections + skills vector index")]
+    end
+
+    UI -->|run / replay| ORCH
+    UI -.read.-> ATLAS
+    ORCH --> DEC --> VSPEC --> EXEC --> SYN --> VAL --> SURV --> VIZ --> REP --> REPU
+    EXEC --> COAL --> SC --> MARSH --> BB
+    DEC & VSPEC & SYN & VAL & SURV & VIZ & REP & MARSH --> CHAT
+    CHAT --> MOCK
+    CHAT --> TPL
+    EXEC -->|skills query| MATCH
+    ORCH & EXEC & MARSH & VAL & VIZ & REP & REPU --> WRITES
+    WRITES --> ATLAS
+    MATCH --> ATLAS
+```
+
+### Pipeline dataflow
+
+A single brief flows through nine stages; each stage's output is a row in MongoDB and an event on the bus. The `validation_spec` derived from the prompt is the only artifact that flows *backwards* into an earlier-running stage (it is read by every marshal kickoff during execution).
+
+```mermaid
+flowchart TD
+    PROMPT([User brief]) --> D[1. Decompose<br/>subtasks DAG]
+    D --> VS[2. Validator-Spec<br/>criteria list]
+    VS -. criteria .-> E
+    D --> E[3. Execute subtasks<br/>per-subtask coalition + 3 rounds]
+    E --> S[4. Synthesise<br/>design_specs JSON]
+    S --> V[5. Validate<br/>generic dispatcher + judge]
+    VS -. criteria .-> V
+    V --> C[6. Cost<br/>QTO * rate card]
+    C --> G[7. Visualise<br/>geometry primitives]
+    G --> R[8. Report<br/>markdown brief]
+    R --> P[9. Reputation<br/>per-agent delta]
+    P --> OUT([Final run row + artefacts])
+
+    classDef stage fill:#eef,stroke:#557,stroke-width:1px;
+    class D,VS,E,S,V,C,G,R,P stage;
+```
+
+### Data model (collections + key relationships)
+
+Thirteen collections, one vector index. `events` is the audit spine — every domain insert pairs with an event row, which is what makes a replay a *read* rather than a re-execution.
+
+```mermaid
+erDiagram
+    RUNS ||--o{ SUBTASKS : "has"
+    RUNS ||--|| DESIGN_SPECS : "synthesises to"
+    RUNS ||--|| VALIDATION_RESULTS : "validated by"
+    RUNS ||--|| COST_ESTIMATES : "costed as"
+    RUNS ||--o{ ARTIFACTS : "produces"
+    RUNS ||--o{ EVENTS : "audited by"
+    RUNS {
+        string run_id PK
+        string prompt
+        object validation_spec "criteria[]"
+    }
+    SUBTASKS ||--o{ ASSIGNMENTS : "staffed by"
+    SUBTASKS ||--o{ COALITION_MESSAGES : "round 0..2"
+    SUBTASKS ||--|| SUBTASK_OUTPUTS : "produces"
+    ASSIGNMENTS }o--|| AGENTS : "agent_id"
+    AGENTS ||--o{ SKILLS : "bag of"
+    SKILLS {
+        string skill_id PK
+        vector embedding "1536-d cosine index"
+    }
+    AGENTS ||--o{ REPUTATION_UPDATES : "delta per run"
+```
+
+### The single global flag: mock vs real
+
+Exactly one switch (`USE_MOCK_LLM`) decides where the LLM and embedder traffic goes. Everything else — Atlas, vector search, writes, replay — is identical in both modes. The replay path is special: it reads only.
+
+```mermaid
+flowchart LR
+    REQ[chat / embed call] --> CFG{USE_MOCK_LLM?}
+    CFG -- "true (default)" --> MOCKL[role-keyed mock<br/>+ SHA-256 pseudo-embedding<br/>counter NOT bumped]
+    CFG -- "false (real)" --> OAI[OpenAI<br/>counter bumped]
+    MOCKL --> OUT[response]
+    OAI --> OUT
+    REPLAY[Replay button] --> NOLLM[orchestrator skips all chat/embed<br/>reads runs/* + events from Atlas]
+    NOLLM --> ASSERT["assert call_counter() == 0"]
+```
+
+---
+
+
 ## 2. Why MongoDB Atlas, and which parts are real
 
 **MongoDB Atlas is real.** All thirteen domain collections (`runs`, `subtasks`, `assignments`, `coalition_messages`, `subtask_outputs`, `design_specs`, `validation_results`, `cost_estimates`, `artifacts`, `agents`, `skills`, `reputation_updates`, `events`) are live, hosted on an M10 cluster in `eu-west-2`, indexed and exercised on every run.
@@ -64,7 +195,7 @@ The contribution-score column visible in the UI is the *solo* coalition value of
 
 ---
 
-## 4. Coalition formation: pairwise complementarity, not a market
+## 4. Coalition formation: pairwise complementarity.
 
 The coalition value is a **rank-1 Shapley with pairwise complementarity**:
 
@@ -77,7 +208,7 @@ with `α=0.6, β=0.3, γ=0.1, λ=0.4`. We greedily seed with the highest-solo sk
 
 Three deliberate non-choices, each a mistake we did not make:
 
-- **It is not a price-clearing market.** No skill bids, no auction, no truthful-reporting incentive. Calling this system a market would be misleading; the codebase is consistent that the unit is a *coalition*. A truthful-reporting layer with declared confidence and ex-post penalty is a separate, post-hackathon piece of work (see `TODO.md`).
+- **It is not a price-clearing market.**  A truthful-reporting layer with declared confidence and ex-post penalty is a separate, post-hackathon piece of work (see `TODO.md`).
 - **It is not a full Shapley computation.** Full Shapley over even a 15-candidate pool is 2^15 coalitions; the rank-1 + pairwise approximation is closed-form and runs in microseconds, which is the right complexity budget for a demo.
 - **It is not pure top-k cosine.** Pure top-k would silently produce three indistinguishable skills for any subtask whose primary capability has near-duplicates in the index. The complementarity bonus is what makes the assignment *interesting*, and it is the thing the UI's "Coalitions" tab is built to show.
 
