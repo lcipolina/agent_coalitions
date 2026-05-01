@@ -4,9 +4,38 @@
 > **Source:** https://cerebralvalley.ai/e/mongo-db-london-hackathon/details
 > **Build window:** 1 day
 > **Audience:** Hackathon judges + technical reviewers
-> **Status:** Methodology locked. This document is the contract for the coding agent.
+> **Status:** Methodology locked. Amendments dated 2026-05-01 applied (see block below). This document is the contract for the coding agent.
 >
-> **Note on terminology.** Earlier drafts of this brief called the system a "market". On reflection that word overstates what we build (no prices, no private information, no incentive compatibility). The accurate name is **capability-search-based delegation system**, with the closest legitimate academic analogy being a **one-sided matching mechanism**. We retain the word *market* only in the demo-pitch tab name and the colloquial sense — see Appendix A.
+> **Note on terminology.** Earlier drafts of this brief called the system a "market". On reflection that word overstates what we build (no prices, no private information, no incentive compatibility). The accurate name is **capability-search-based delegation system**, with the closest legitimate academic analogy being a **one-sided matching mechanism**. The word *market* is **no longer used** anywhere in current usage — UI, code, DB, narration. Appendix A retains the historical discussion of why we don't use it.
+
+---
+
+## Amendments 2026-05-01
+
+Lead-confirmed amendments resolving every ambiguity flagged in `PLAN.md §3`. Where this block conflicts with the body of the document, **this block wins**.
+
+1. **Naming (Q21).** The word "market" is banned in current usage. DB name `agent_market` → **`agent_coalitions`**. Conda env `agent-market` → **`agent-coalitions`**. Project / app title "Agent Market" → **"Agent Coalitions"**. Streamlit tab #2 "Agent Market" → **"Assignments"** (tab #3 "Coalitions" unchanged). Run button "Run Agent Market" → **"Run Coalitions"**. §10 narration drops the "agent market for short" phrasing. Appendix A retained as historical discussion.
+2. **Summary token cap (Q1).** Standardised on **≤ 200 tokens** for `subtask_outputs.summary` everywhere. Truncation via `tiktoken`.
+3. **Algorithm definitions filled in (§4.2; Q3, Q4, Q5).** `coverage(s, q) = clip(cosine(emb(s), emb(q)), 0, 1)`. `prior_reputation(s)` = min-max normalisation across the catalog of `0.5·log(1+installs) + 0.5·log(1+stars)`. The γ term reads `log(1+installs(s)) / log(1+max_installs_in_catalog)`, ∈ [0,1].
+4. **Default 7-subtask DAG (§4.1; Q6).** Used as decomposer fallback and by mock decomposer: T1 Site & geometry; T2 Load profile; T3 Material selection (deps T1,T2); T4 Structural system (deps T1,T2,T3); T5 Aesthetic & elevation guidance (deps T1,T4); T6 Validation prep (deps T3,T4); T7 Final synthesis brief (deps all).
+5. **Marshal (§13; Q7).** Single shared synthetic marshal `agent_id = "agent_synthetic_marshal"` for v1.
+6. **Validator checks (§4.6 / §3.9; Q8).** Minimum five: `span_to_depth_ratio`, `support_count_consistency`, `live_load_arithmetic`, `material_span_plausibility`, `lane_geometry`. Specific thresholds in `PLAN.md §3.6`.
+7. **Cost model (Q9).** Hand-picked unit prices in `cost_model.json`. Currency tag `EUR` retained per spec; values reasonable US-style (steel $3,500/t, weathering steel $4,000/t, concrete $180/m³, deck slab $350/m², piers $150,000 each, abutments $220,000 each, finishing premium 10%, contingency 15%).
+8. **Schema additions (Q10, Q11, Q24).** `validation_results` gains `judge_scores: [{subtask_id, clarity, completeness, consistency, rationale}]`. `runs` gains `config: {seed, git_sha, use_mock_llm}` (top-level `runs.use_mock_llm` collapsed into config). `runs.summary_metrics.estimated_cost_eur` is a denormalised copy of `cost_estimates.total`.
+9. **Blackboard simplification (§4.5; Q23).** Coalition agents post in **parallel** in round 1, seeing only the marshal kickoff and upstream `subtask_outputs.summary`. Agents do not see each other's contributions in round 1. Marshal then reconciles in round 2; one optional revision round (round 3) follows if conflict flagged.
+10. **Replay verification (Q13).** `src/llm/openai_client.py` exposes a process-local call counter; replay path resets it then asserts `== 0` at end. Replay events are tagged `kind: "replay"`.
+11. **Vector index creation (Q14).** `src/db/indexes.py` calls `database.create_search_index(...)`. Soft-fail with explicit error if cluster lacks Atlas Search.
+12. **Disclaimer string (Q22).** Canonical text used verbatim everywhere: *"Conceptual design produced by an experimental multi-agent system. Not certified engineering. Not for construction."*
+13. **Synthetic agent population (§3.2; Q17).** 20 agents: 14 with 2 skills, 4 with 3 skills, 2 with 4 skills.
+14. **Orchestrator (Q20).** LangGraph, with pre-approved escape hatch to a plain function pipeline if it blocks gate G6 by more than ~30 minutes.
+15. **`skills_seed.json` (Q2).** ~30–50 hand-authored entries for v1. Swap to 150 real skills.sh entries is tracked in `TODO.md`.
+16. **Mock LLM judge (Q16).** Mock mode returns templated mid scores so the radar chart populates. Switch to real judge in mock-mode tracked in `TODO.md`.
+17. **`llm_cache` collection (Q12).** Skipped for MVP. Replay reads `subtask_outputs` / `coalition_messages` directly.
+18. **Repo layout (Q24/§8).** Workspace root *is* the project root; no nested `agent_market/` directory. The DB name `agent_coalitions` provides the namespace separation.
+19. **Test scope (§8 / §9.6; Q18).** The four files in §8 are authoritative.
+20. **Stretch (Q15, Q19).** §11.2 strategy comparison and §5.3 AI hero render are stretch gates G12 / G13 — not part of definition-of-done.
+
+See `PLAN.md` for the executable plan.
 
 ---
 
@@ -111,7 +140,7 @@ A user submits a prompt. An LLM **decomposer** turns it into a DAG of subtasks, 
 ```
                  ┌────────────────────────────────────────────┐
                  │ Streamlit UI                                │
-                 │ tabs: Overview · Market · Coalitions ·      │
+                 │ tabs: Overview · Assignments · Coalitions · │
                  │       Design · Validation · Budget ·        │
                  │       MongoDB Records · Final Report        │
                  └──────────┬──────────────────────┬───────────┘
@@ -169,7 +198,7 @@ If a reviewer challenges *"why Mongo and not just dicts?"* the answer is: persis
 
 ## 3. Data Model (System-Design Schema)
 
-All collections live in the database `agent_market`. Every document carries a `run_id` (ObjectId, UUID, or hash) where applicable. Timestamps are ISO 8601 UTC.
+All collections live in the database `agent_coalitions`. Every document carries a `run_id` (ObjectId, UUID, or hash) where applicable. Timestamps are ISO 8601 UTC.
 
 ### 3.1 `skills`
 
@@ -302,7 +331,7 @@ Indexes: `(run_id, subtask_id, ts)`.
 
 ### 3.7 `subtask_outputs`
 
-The marshal-consolidated, token-bounded summary that *crosses subtask boundaries*. Strict contract: ≤ 150 tokens.
+The marshal-consolidated, token-bounded summary that *crosses subtask boundaries*. Strict contract: ≤ 200 tokens (per Amendments 2026-05-01).
 
 ```json
 {
@@ -479,7 +508,7 @@ reconcile(T):
        reconcile_again()
    subtask_outputs.insert({
      run_id, subtask_id=T.id,
-     summary=reconcile.final_summary,        # ≤150 tokens, enforced
+     summary=reconcile.final_summary,        # ≤200 tokens, enforced
      structured=reconcile.structured_output
    })
 ```
@@ -577,7 +606,7 @@ Wide layout. Fixed top bar with app name + disclaimer banner.
 ### 6.1 Tabs
 
 1. **Overview** — run metadata, key metrics, both visuals side-by-side, validation badge.
-2. **Agent Market** *(pitch label)* — three subsections: Tasks table; Assignments table with contribution scores and selection rationale; live event timeline. Tab name kept colloquial; technically this is the *Assignment Ledger* tab.
+2. **Assignments** — three subsections: Tasks table; Assignments table with contribution scores and selection rationale; live event timeline. (Per Amendments 2026-05-01 the tab is named "Assignments"; it was "Agent Market" in earlier drafts.)
 3. **Coalitions** — one collapsible card per subtask, each rendering its `coalition_messages` as a chat-style timeline (marshal in one colour, agents in another). This is the **direct visual answer** to the hackathon question about agent communication.
 4. **Design** — design_spec table + engineering schematic.
 5. **Validation** — validation cards, deterministic check results, warnings.
@@ -589,7 +618,7 @@ Wide layout. Fixed top bar with app name + disclaimer banner.
 
 - prompt textarea (default: bridge prompt)
 - toggle: *Use mock LLM* (default off after Phase 6)
-- button: *Run Agent Market*
+- button: *Run Coalitions*
 - button: *Replay last run from MongoDB* (reads everything from Mongo, no LLM calls — proves persistence)
 
 ### 6.3 Live progress
@@ -614,7 +643,7 @@ Mock mode is the *fallback if the OpenAI key fails during demo*. It must not be 
 ## 8. Project Structure
 
 ```
-agent_market/
+.   # workspace root IS the project root (per Amendments 2026-05-01 #18)
 ├── README.md
 ├── pyproject.toml or requirements.txt
 ├── .env.example
@@ -667,7 +696,7 @@ The coding agent **must** follow this section verbatim. Deviations require a wri
 
 1. **Single Python process.** No external services other than MongoDB Atlas and OpenAI.
 2. **Python 3.10+.**
-3. **Reproducible environment.** Create a dedicated conda environment (`environment.yml` checked into the repo, name `agent-market`) so teammates can clone and run with a single `conda env create -f environment.yml`. Pin major versions of `pymongo`, `openai`, `streamlit`, `plotly`, `python-dotenv`. A `requirements.txt` mirror is fine but the conda env is the source of truth.
+3. **Reproducible environment.** Create a dedicated conda environment (`environment.yml` checked into the repo, name `agent-coalitions`) so teammates can clone and run with a single `conda env create -f environment.yml`. Pin major versions of `pymongo`, `openai`, `streamlit`, `plotly`, `python-dotenv`, `langgraph`, `tiktoken`. A `requirements.txt` mirror is fine but the conda env is the source of truth.
 4. **All secrets via `.env` (python-dotenv).** Provide a tracked `.env.example` with placeholder values for `MONGODB_URI`, `MONGODB_DB`, `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL`, `OPENAI_CHAT_MODEL`, `USE_MOCK_LLM`. The real `.env` is gitignored. `src/config.py` is the single point of `load_dotenv()` and exposes typed config to the rest of the codebase. **No secret literal anywhere else in the source tree.**
 5. **All Mongo writes idempotent on retry.** Use `run_id` as the partition key for everything.
 6. **Mock mode is first-class.** Develop in mock mode first; LLMs come last.
@@ -698,7 +727,7 @@ If running out of time, cut in this order: AI hero render → vector search (fal
 
 The MVP is shippable when **all** of the following hold:
 
-1. Running `streamlit run src/ui/app.py` and clicking *Run Agent Market* with the default prompt completes in under 90 seconds in mock mode and under 5 minutes in LLM mode.
+1. Running `streamlit run src/ui/app.py` and clicking *Run Coalitions* with the default prompt completes in under 90 seconds in mock mode and under 5 minutes in LLM mode.
 2. The Mongo `events` collection contains at least one event for every pipeline stage.
 3. `coalition_messages` contains at least 12 messages for the default prompt across all subtasks.
 4. `subtask_outputs.summary` is non-empty for every subtask and ≤ 200 tokens each.
@@ -715,14 +744,14 @@ The agent must work in small commits and tick off these gates **in order**. Each
 
 | # | Gate | Pass check |
 |---|------|-----------|
-| G1 | Conda env reproducible | `conda env create -f environment.yml` succeeds on a clean shell; `conda activate agent-market && python -c "import pymongo, openai, streamlit, plotly, dotenv"` exits 0. |
+| G1 | Conda env reproducible | `conda env create -f environment.yml` succeeds on a clean shell; `conda activate agent-coalitions && python -c "import pymongo, openai, streamlit, plotly, dotenv, langgraph, tiktoken"` exits 0. |
 | G2 | Config + secrets wiring | `cp .env.example .env`, fill in MONGODB_URI + OPENAI_API_KEY, then `python -c "from src.config import settings; print(settings.mongodb_db)"` prints the db name. No secret literal anywhere outside `.env`. |
 | G3 | Mongo connectivity | `python -m src.scripts.ping_mongo` connects, lists collections, creates the 11 collections + indexes from § 3, exits 0. |
 | G4 | Skills ingested | `python -m src.scripts.ingest_skills` populates `skills` and `agents` from `skills_seed.json`; counts printed match the seed file. |
 | G5 | Vector search live | `python -m src.scripts.test_vector_search "structural steel design"` returns ≥ 1 candidate with a similarity score. |
 | G6 | Mock pipeline end-to-end | With `USE_MOCK_LLM=true`, `python -m src.run --prompt "design a 2 km bridge for 50 cars/h"` completes in < 30 s; `subtask_outputs` non-empty for every subtask; ≥ 12 rows in `coalition_messages`; every pipeline stage has an `events` row. |
 | G7 | Real-LLM pipeline end-to-end | With `USE_MOCK_LLM=false`, same command completes in < 5 min; same invariants as G6. |
-| G8 | Streamlit renders | `streamlit run src/ui/app.py` opens; clicking *Run Agent Market* with the default prompt populates all 8 tabs without errors; both visuals render. |
+| G8 | Streamlit renders | `streamlit run src/ui/app.py` opens; clicking *Run Coalitions* with the default prompt populates all 8 tabs without errors; both visuals render. |
 | G9 | Replay works | After a finished run, *Replay from MongoDB* reproduces the same UI state with zero new LLM calls (verify via OpenAI request log or by disabling the API key). |
 | G10 | Reputation persists | Running the same prompt twice in a row leaves at least three `agents.reputation` values changed. |
 | G11 | Demo script passes | The narration in § 10 plays through start-to-finish in under 90 seconds without manual intervention. |
@@ -753,11 +782,11 @@ The agent should treat this table as the single source of progress. **No gate ma
 
 ## 10. Demo Script (60–90 s)
 
-> *"Multi-agent systems face a delegation problem. With many agents and overlapping skills, choosing the right team is combinatorial. We solve it with a centralised, capability-search-based delegation system on MongoDB Atlas — we call it an *agent market* for short, but technically it's a one-sided matching mechanism."*
+> *"Multi-agent systems face a delegation problem. With many agents and overlapping skills, choosing the right team is combinatorial. We solve it with a centralised, capability-search-based delegation system on MongoDB Atlas — technically a one-sided matching mechanism."*
 >
 > *"I'll submit a brief: design a 2-kilometre bridge for 50 cars per hour. The system pulls real skills from the skills.sh catalog into MongoDB. An LLM decomposes the brief into seven subtasks. For each one, MongoDB Atlas Vector Search reduces hundreds of skills to a handful, and a pairwise-complementarity score — a rank-1 Shapley approximation — selects a coalition of two or three."*
 >
-> *"Each coalition collaborates on a Mongo-backed blackboard. An LLM marshal opens the discussion, agents post contributions, the marshal reconciles. The only thing that leaves the coalition is a 150-token summary — that is how we share context within token limits."*
+> *"Each coalition collaborates on a Mongo-backed blackboard. An LLM marshal opens the discussion, agents post contributions, the marshal reconciles. The only thing that leaves the coalition is a 200-token summary — that is how we share context within token limits."*
 >
 > *"At the end we get a unified design spec, deterministic validation, a cost estimate, and two visuals: an engineering schematic and a stylised architectural elevation. Everything lives in MongoDB — including the agent reputations, which update at the end of every run. Watch — I'll run it again, and you'll see the coalition selections shift because reputations changed."*
 >
@@ -858,7 +887,7 @@ This addresses the most common reviewer complaint about LLM demos ("I can't repr
 This document is the contract. The coding agent implements it as written. Deviations are flagged in writing.
 
 **Reviewers (please sign):**
-- [ ] Lucia (lead)
+- [x] Lucia (lead) — amendments approved 2026-05-01
 - [ ] Teammate 1
 - [ ] Teammate 2
 
@@ -910,15 +939,9 @@ Our system fits the same shape:
 
 This is the framing we use when challenged.
 
-### A.3 Where we still use the word "market"
+### A.3 Where we previously used the word "market"
 
-For narrative reasons we keep *market* in three specific places, all clearly colloquial:
-
-- the Streamlit tab name **"Agent Market"** (technically the Assignment Ledger);
-- the run-button label **"Run Agent Market"**;
-- the database name `agent_market` and project directory `agent_market/`.
-
-These are pitch and code identifiers, not technical claims. The demo script (§10) and the abstract have been rewritten to either qualify the word or replace it.
+Earlier drafts kept *market* in three places, all colloquial: the Streamlit tab name "Agent Market", the run-button label "Run Agent Market", and the database / project directory name `agent_market`. **As of Amendments 2026-05-01 these are all renamed** (tab → "Assignments", button → "Run Coalitions", DB → `agent_coalitions`, repo layout uses the workspace root). The word *market* survives in this document only as historical / philosophical discussion of why we don't use it.
 
 ### A.4 What it would take to legitimately call this a market
 
