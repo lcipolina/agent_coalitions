@@ -105,6 +105,6 @@ OpenAI proper via `OPENAI_EMBEDDING_API_KEY`.
 
 ## Repository layout
 
-See [ARCHITECTURE.md §10](ARCHITECTURE.md#10-repository-layout). The same document also contains the system-level design rationale behind every non-trivial choice in this codebase.
+See [ARCHITECTURE.md §11](ARCHITECTURE.md#11-repository-layout). The same document also contains the system-level design rationale behind every non-trivial choice in this codebase.
 
 ---

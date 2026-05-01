@@ -7,10 +7,11 @@ Stages (sequential):
   4. synthesise         -> design_specs row
   5. validate           -> validation_results row
   6. estimate_cost      -> cost_estimates row
-  7. build_report       -> artifacts row + runs.final_report_md
-  8. apply_reputations  -> reputation_updates rows
+  7. visualise          -> artifacts row (kind=geometry_json)
+  8. build_report       -> artifacts row + runs.final_report_md
+  9. apply_reputations  -> reputation_updates rows
 
-Replay path: if ``replay=True`` we skip stages 2-8 and only re-read the
+Replay path: if ``replay=True`` we skip stages 2-9 and only re-read the
 existing rows for the given run_id. The G9 invariant
 (``openai_client.call_counter == 0``) is asserted by the caller.
 """
@@ -32,6 +33,7 @@ from src.pipeline.reputation import apply_run_reputations
 from src.pipeline.surveyor import estimate
 from src.pipeline.synthesis import synthesise
 from src.pipeline.validation import validate
+from src.pipeline.visualiser import build_geometry
 from src.progress import emit
 
 log = logging.getLogger(__name__)
@@ -135,7 +137,11 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
     emit("stage_start", {"stage": "estimate"})
     cost = estimate(run_id, spec)
     emit("stage_end", {"stage": "estimate"})
-    # Stage 7: report.
+    # Stage 7: visualise (spec -> 3D geometry primitives).
+    emit("stage_start", {"stage": "visualise"})
+    build_geometry(run_id, spec)
+    emit("stage_end", {"stage": "visualise"})
+    # Stage 8: report.
     emit("stage_start", {"stage": "report"})
     md = build_report(run_id, prompt, spec, validation, cost)
     emit("stage_end", {"stage": "report"})

@@ -10,15 +10,16 @@ The system was built for a one-day hackathon, so every choice is calibrated to t
 
 A user submits a single design brief, e.g. *"design a 2 km bridge for 50 cars/h with trucks, modern aesthetic"*. The pipeline returns a conceptual bridge proposal: a final spec table, a deterministic validation card, a costed quantity take-off in EUR, a side-elevation visualisation, and a markdown brief.
 
-Internally, this is delivered by a fixed seven-stage sequential pipeline:
+Internally, this is delivered by a fixed eight-stage sequential pipeline:
 
 1. **Decompose** — a single LLM call splits the brief into a 5–8-node DAG of subtasks (site, loads, materials, structural system, aesthetics, validation prep, final synthesis).
 2. **Execute subtasks** — for each subtask, the system retrieves candidate skills via Atlas Vector Search, forms a small coalition of skills, picks ≤ 3 agents that cover those skills, runs a three-round blackboard exchange (marshal kickoff → parallel agent contributions → marshal reconcile), and writes a token-capped subtask output.
 3. **Synthesise** — one LLM call rolls every subtask output into a structured `design_specs` JSON.
 4. **Validate** — five deterministic checks (span/depth, support-count consistency, live-load arithmetic, material/span plausibility, lane geometry) plus a per-subtask LLM judge with clarity/completeness/consistency scores.
 5. **Cost** — a quantity-take-off heuristic over the spec, multiplied by a fixed `cost_model.json` rate card, with a 10% finishing premium and 15% contingency, and a one-paragraph surveyor narrative.
-6. **Report** — a markdown brief with the final spec table, validation card, cost roll-up, and a per-team contribution section.
-7. **Reputation** — every participating agent gets a per-run reputation delta scaled by load (subtasks participated in) and quality (mean contribution score), persisted on the `agents` collection.
+6. **Visualise** — a deterministic spec-to-primitives builder turns the design spec into a generic 3D geometry artifact (a list of axis-aligned boxes and polylines with absolute world coordinates) and writes it as an `artifacts` row of kind `geometry_json`. The renderer in the UI is intentionally domain-agnostic; see §6.
+7. **Report** — a markdown brief with the final spec table, validation card, cost roll-up, and a per-team contribution section.
+8. **Reputation** — every participating agent gets a per-run reputation delta scaled by load (subtasks participated in) and quality (mean contribution score), persisted on the `agents` collection.
 
 The pipeline is also **replayable**: given a `run_id`, the orchestrator can re-read every artefact from MongoDB without making any LLM calls. This is asserted in code (`openai_client.call_counter() == 0` after replay) and exercised by the Streamlit "Replay current" button.
 
@@ -149,7 +150,37 @@ LangGraph remains an installed dependency so that adding a revision round (round
 
 ---
 
-## 10. Repository layout
+## 10. Visualisation: a generic renderer fed by a domain-aware builder
+
+The picture in the Rendering tab is not produced ad-hoc by the UI. It is the output of a real pipeline stage (`src/pipeline/visualiser.py`) that runs between the cost stage and the report stage, and writes an `artifacts` row of kind `geometry_json` for every run. That row is part of the replay surface: re-running the UI on a past `run_id` re-draws the picture without recomputing anything.
+
+The artifact is a **generic 3D primitive list** with three keys:
+
+```json
+{
+  "primitives": [
+    {"kind": "box",  "x": [0, 2000], "y": [-6, 6], "z": [14.3, 15.5],
+     "color": "#2c2c2c", "name": "deck"},
+    {"kind": "line", "points": [[1000, 4.8, 28.6], [1100, 4.8, 15.5]],
+     "color": "rgba(40,40,40,0.65)", "width": 1.5, "name": "cable_1_3_1_4"}
+  ],
+  "title": "Multi-Span Cable Stayed · 2000 m total · longest span 200 m",
+  "axes":  {"x": "length (m)", "y": "width (m)", "z": "height (m)"}
+}
+```
+
+Two pieces, deliberately separated:
+
+- **The builder** (`src/pipeline/visualiser.py`) is where any domain knowledge lives. It reads the spec — total length, span layout, deck width, structural depth, bridge type — and emits primitives. For a cable-stayed bridge it emits a deck box, pier boxes, pylon boxes, and twin planes of fanned stay-cable polylines; for a suspension bridge it emits two towers and a parabolic main cable with vertical hangers; for an arch it emits a parabolic arch with spandrel verticals; for a truss it emits chords, diagonals and verticals; otherwise it emits the multi-girder default. The builder is the natural seam at which a real LLM call would be plugged in to support arbitrary domains (rollercoaster, tower, dam): the prompt asks the model to emit primitives JSON conforming to the schema above, and the rest of the system is unchanged.
+- **The renderer** (`src/ui/render3d.py`) is intentionally dumb and generic. It draws a `box` primitive as a `go.Mesh3d` with the standard 12-triangle cuboid topology, and a `line` primitive as a `go.Scatter3d` polyline. It has no knowledge of bridges, decks, or cables. Adding a new primitive type later (`cylinder`, `mesh`) is a one-function change in the renderer; it does not require touching any pipeline code.
+
+Plotly is the chosen 3D library because it was already a dependency for the other tabs and it gives the demo interactive rotate / zoom for free. The renderer fixes `aspectmode="data"` so 1 m on the x axis is the same screen length as 1 m on the z axis — a 2 km × 30 m structure stays recognisably a deck rather than a cube.
+
+Coordinate convention is fixed: x along structure length, y across width, z up. This is the only contract between the builder and the renderer; everything else is data.
+
+---
+
+## 11. Repository layout
 
 ```
 app.py                       # Streamlit UI (run with: streamlit run app.py)
@@ -186,10 +217,11 @@ src/
 
   pipeline/
     decomposer.py, execution.py, synthesis.py, validation.py,
-    surveyor.py, reporter.py, reputation.py, orchestrator.py
+    surveyor.py, visualiser.py, reporter.py, reputation.py, orchestrator.py
 
   ui/
-    bridge_view.py           # stylised per-typology elevation renderer
+    render3d.py              # generic primitives -> plotly 3D figure
+    bridge_view.py           # legacy 2D side-elevation (kept for reference)
 
   scripts/
     ingest_skills.py, ping_mongo.py, test_vector_search.py

@@ -38,8 +38,9 @@ STAGES = [
     ("synthesise", "3️⃣  Synthesise spec"),
     ("validate", "4️⃣  Validate"),
     ("estimate", "5️⃣  Cost"),
-    ("report", "6️⃣  Report"),
-    ("reputation", "7️⃣  Reputation"),
+    ("visualise", "6️⃣  Render geometry"),
+    ("report", "7️⃣  Report"),
+    ("reputation", "8️⃣  Reputation"),
 ]
 
 
@@ -246,10 +247,10 @@ if metrics:
     c4.metric("Cost (EUR)", f"{cost:,.0f}" if isinstance(cost, (int, float)) else "—")
 
 (
-    tab_dag, tab_coal, tab_bb, tab_val, tab_cost, tab_bridge, tab_report, tab_reput,
+    tab_dag, tab_coal, tab_bb, tab_val, tab_cost, tab_render, tab_report, tab_reput,
 ) = st.tabs([
     "🌳 DAG", "🤝 Coalitions", "💬 Blackboard", "✅ Validation",
-    "💶 Cost", "🌉 Bridge", "📄 Report", "📈 Reputation",
+    "💶 Cost", "🎨 Rendering", "📄 Report", "📈 Reputation",
 ])
 
 
@@ -367,18 +368,34 @@ with tab_cost:
         st.markdown(f"> {c['narrative']}")
 
 
-# ----- Bridge visualisation ------------------------------------------------
-with tab_bridge:
+# ----- 3D rendering ---------------------------------------------------------
+with tab_render:
+    art = db.artifacts.find_one(
+        {"run_id": run_id, "kind": "geometry_json"}, {"_id": 0},
+    )
     spec = db.design_specs.find_one({"run_id": run_id}, {"_id": 0})
-    if not spec:
-        st.info("No design spec yet.")
+    if not art:
+        st.info(
+            "No geometry artifact yet. The orchestrator runs a `visualise` "
+            "stage that converts the design spec into a list of 3D primitives "
+            "(boxes + polylines) and stores them as an `artifacts` row of "
+            "kind `geometry_json`. Re-run the pipeline to regenerate."
+        )
     else:
-        from src.ui.bridge_view import render_bridge
+        from src.ui.render3d import render_geometry
 
-        fig = render_bridge(spec)
+        geometry = art["uri_or_inline"]
+        st.caption(
+            f"Generic 3D renderer — plots whatever primitives the visualiser "
+            f"stage produced. {len(geometry.get('primitives', []))} primitives "
+            f"in this artifact."
+        )
+        fig = render_geometry(geometry)
         st.plotly_chart(fig, use_container_width=True)
         with st.expander("Raw design spec (JSON)"):
-            st.json(spec, expanded=False)
+            st.json(spec or {}, expanded=False)
+        with st.expander("Raw geometry primitives (JSON)"):
+            st.json(geometry, expanded=False)
 
 
 # ----- Report ---------------------------------------------------------------
