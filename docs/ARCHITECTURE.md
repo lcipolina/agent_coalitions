@@ -2,6 +2,8 @@
 
 This document explains how Agent Coalitions is built and why. It is the long-form companion to `MVP_DESIGN.md` (the contract) and `PLAN.md` (the gate-by-gate execution plan); the cooperative-game-theory background sits in `GAME_THEORY_PRIMER.md`.
 
+> **Looking for the elevator pitch?** See [MATCHING_PIPELINE.md](MATCHING_PIPELINE.md) for a single-page walkthrough of how a free-text requirement becomes a working agent team — vector search → coverage floor → greedy coalition → set-cover → Shapley credit — with infographics and the *"MongoDB plays five distinct roles"* cheat-sheet.
+
 The system was built for a one-day hackathon, so every choice is calibrated to the question: *what produces a credible, judgeable end-to-end demo within a single working day, while keeping every interesting design decision honest?*
 
 ---

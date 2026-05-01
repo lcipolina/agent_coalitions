@@ -135,7 +135,7 @@ with st.sidebar:
         .sort("started_at", -1).limit(5)
     )
     for r in recent:
-        label = f"`{r['run_id']}` — {r.get('status', '?')}"
+        label = f"`{r['run_id']}` \u2014 {r.get('status', '?')}"
         if st.button(label, key=f"hist_{r['run_id']}", use_container_width=True):
             st.session_state.run_id = r["run_id"]
             st.session_state.running = False
@@ -211,14 +211,21 @@ def _live_listener_factory(
 
         elif kind == "coalition_formed":
             skills_md = "\n".join(
-                f"  - `{s['skill_id']}` — *{s['name']}*  "
-                f"(solo {s['solo']:.2f})"
+                f"  - `{s['skill_id']}` \u2014 *{s['name']}*  "
+                f"(\u03c6 {s.get('shapley', s.get('solo', 0.0)):.2f})"
                 for s in info["skills"]
             )
+            shapley_total = sum(a.get("shapley", 0.0) for a in info["agents"]) or 1.0
+            # Pre-compute the per-agent skill list as a plain string outside
+            # the f-string. Python 3.11 forbids backslashes inside f-string
+            # ``{...}`` expressions, so the ``'\u2014'`` fallback escape
+            # cannot live there directly.
+            EM_DASH = "\u2014"
             agents_md = "\n".join(
-                f"  - 🤖  **{_agent_label(a['agent_id'])}**  "
-                f"score `{a['score']:.2f}`  "
-                f"→ skills: {', '.join(a['skills_contributed']) or '—'}"
+                f"  - \U0001f916  **{_agent_label(a['agent_id'])}**  "
+                f"\u03c6 `{a.get('shapley', 0.0):.2f}` "
+                f"({100.0 * a.get('shapley', 0.0) / shapley_total:.0f} %)  "
+                f"\u2192 skills: {(', '.join(a['skills_contributed']) or EM_DASH)}"
                 for a in info["agents"]
             )
             skill_box.markdown(
@@ -467,16 +474,34 @@ with tab_coal:
                     )
                 st.dataframe(skill_docs, use_container_width=True, hide_index=True)
                 st.markdown("**Agent contributions**")
+                # Build the contributions table.
+                #
+                # We display two views of each agent's contribution:
+                #   - ``shapley``   : the absolute Shapley payoff, i.e. the
+                #     exact closed-form value ``a_i + ½·Σ w_ij`` that this
+                #     agent's skills earn from the induced-subgraph game
+                #     for this subtask. Sums across the table to ``v(N)``,
+                #     the team's total worth — that is the *efficiency*
+                #     axiom of the Shapley value.
+                #   - ``share %``   : the same number normalised to the
+                #     team total, so each row reads as "X % of the credit
+                #     for this team's joint output". This is the most
+                #     intuitive per-agent metric for a non-game-theory
+                #     audience.
+                contribs = a.get("contribution_scores", [])
+                shapley_total = sum(cs.get("shapley", 0.0) for cs in contribs) or 1.0
                 contrib_rows = [
                     {
                         "agent": _agent_label(cs["agent_id"]),
-                        "score": cs.get("score", 0.0),
-                        "shapley": cs.get("shapley", 0.0),
+                        "shapley": round(cs.get("shapley", 0.0), 4),
+                        "share %": round(
+                            100.0 * cs.get("shapley", 0.0) / shapley_total, 1,
+                        ),
                         "skills_contributed": ", ".join(
                             cs.get("skills_contributed", [])
                         ),
                     }
-                    for cs in a.get("contribution_scores", [])
+                    for cs in contribs
                 ]
                 st.dataframe(
                     contrib_rows, use_container_width=True, hide_index=True,
@@ -484,23 +509,21 @@ with tab_coal:
                 st.caption(f"_Rationale:_ {a.get('selection_rationale', '')}")
         st.markdown("---")
         st.caption(
-            "**About the `score` and `shapley` columns.**  "
-            "`score` is the *solo value* "
-            "(characteristic function on the singleton coalition) of "
-            "the skill the agent contributed: "
-            "`v({s}) = 0.6\u00b7coverage(s, query) + 0.3\u00b7prior_reputation(s) "
-            "+ 0.1\u00b7log(1+installs)/max_log_installs`.  "
+            "**About the `shapley` and `share %` columns.**  "
             "`shapley` is the **exact Shapley value** for the induced-subgraph "
             "game (Deng\u2013Papadimitriou 1994 closed form): "
             "`\u03c6\u1d62 = a\u1d62 + \u00bd\u00b7\u03a3 w\u1d62\u2c7c`, "
-            "where `a\u1d62` is the solo value and `w\u1d62\u2c7c = 0.4\u00b7(1 \u2212 cos(e\u1d62, e\u2c7c))` "
-            "is the pairwise complementarity to the other team members. "
-            "So `score` measures *how good this skill is on its own* for the "
-            "subtask, while `shapley` measures *the fair share of the team's "
-            "joint value* attributable to this skill. The greedy team-formation "
-            "step itself uses single marginal contributions \u2014 a rank-1 "
-            "Shapley approximation \u2014 so `shapley` is computed once on the "
-            "final team for display, not used to drive the selection."
+            "where `a\u1d62` is the solo value of the agent's contributed skill "
+            "(`0.6\u00b7coverage + 0.3\u00b7prior_reputation + 0.1\u00b7log(1+installs)/max`) "
+            "and `w\u1d62\u2c7c = 0.4\u00b7(1 \u2212 cos(e\u1d62, e\u2c7c))` is the pairwise "
+            "complementarity to the other team members. By the *efficiency* "
+            "axiom, the column sums to `v(N)` \u2014 the total worth of the team. "
+            "`share %` is the same number normalised to that total, i.e. *the "
+            "fraction of the team's joint output fairly attributable to this "
+            "agent*. The greedy team-formation loop uses single marginal "
+            "contributions to grow the team \u2014 a rank-1 Shapley "
+            "approximation \u2014 and the exact Shapley closed form is "
+            "computed once on the final team purely for display."
         )
 
 
@@ -764,3 +787,20 @@ with tab_reput:
             for d in deltas
         ]
         st.dataframe(delta_rows, use_container_width=True, hide_index=True)
+        st.caption(
+            "**`subtasks_participated`** \u2014 the subtasks in which this "
+            "agent was selected onto the team for this run.  \n"
+            "**`mean_contribution_score`** \u2014 the average **solo value** "
+            "`v({s}) = 0.6\u00b7coverage(s, query) + 0.3\u00b7prior_reputation(s) "
+            "+ 0.1\u00b7log(1+installs)/max_log_installs` of the skills the "
+            "agent contributed, averaged across the subtasks above. It is *not* "
+            "the Shapley share displayed in the Teams tab; it is the simpler "
+            "per-skill quality signal used to weight the reputation update. "
+            "The actual reputation change persisted on the `agents` collection "
+            "is computed as "
+            "`delta = base \u00b7 (0.5 + 0.5\u00b7load_factor) \u00b7 "
+            "(0.5 + 0.5\u00b7mean_contribution_score)`, where `base` is "
+            "`+0.04 / +0.02 / \u20130.04` for a `conceptual_pass / "
+            "pass_with_warnings / fail` validation outcome and "
+            "`load_factor = len(subtasks_participated) / total_subtasks`."
+        )

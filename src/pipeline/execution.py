@@ -27,11 +27,25 @@ from src.core.tokens import truncate_to_tokens
 def _candidates_for(subtask: dict) -> list[CandidateSkill]:
     db = get_db()
     seen: dict[str, CandidateSkill] = {}
-    # Embed once per capability.
+    # Anchor every capability query with the run's original prompt so the
+    # vector match is biased toward the actual project domain ("design a
+    # bridge for 50 cars" + "material strength under cyclic load") rather
+    # than the generic engineering vocabulary in the capability alone. This
+    # is what stops e.g. ``propulsion-systems`` matching bridge subtasks
+    # purely because both are nominally "engineering" text.
+    run_doc = db.runs.find_one(
+        {"run_id": subtask["run_id"]}, {"_id": 0, "prompt": 1},
+    ) or {}
+    prompt_anchor = (run_doc.get("prompt") or "").strip()
+    # Embed once per (anchored) capability.
     qvec_cache: dict[str, np.ndarray] = {}
     for cap in subtask.get("required_capabilities", []):
-        qvec = np.asarray(embed(cap), dtype=np.float32)
+        anchored = f"{prompt_anchor}\n{cap}" if prompt_anchor else cap
+        qvec = np.asarray(embed(anchored), dtype=np.float32)
         qvec_cache[cap] = qvec
+        # Atlas Vector Search retrieval still uses just the capability
+        # so the recall set is broad; the *coverage* score and the floor
+        # below are what enforce domain alignment.
         hits = search_skills(cap, limit=8)
         for h in hits:
             if h["skill_id"] in seen:
@@ -62,13 +76,12 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
         payload={"subtask_id": subtask["subtask_id"], "n_candidates": len(seen)},
     )
     # Coverage floor: drop any candidate whose semantic similarity to the
-    # subtask query is below 0.30. Without this filter, a skill with a
-    # great prior_reputation/install count but a poor semantic match (e.g.
-    # ``propulsion-systems`` for a bridge subtask) can still slip into the
-    # team because β·prior_rep + γ·log(installs) compensates for the low
-    # α·coverage term. The floor enforces "must be at least loosely
-    # on-topic" before rep/installs get a vote.
-    COVERAGE_FLOOR = 0.30
+    # *prompt-anchored* capability query is below 0.40. The anchor
+    # concatenates the run prompt to each capability before embedding, so
+    # an off-domain skill (e.g. ``propulsion-systems``) needs to match
+    # *both* the project subject (a bridge) and the capability (cyclic
+    # loads) to clear the floor — which it won't.
+    COVERAGE_FLOOR = 0.40
     filtered = [c for c in seen.values() if c.coverage >= COVERAGE_FLOOR]
     # If the floor wipes out the candidate set entirely (very off-domain
     # subtask), fall back to the top-k by coverage so the pipeline still
