@@ -373,46 +373,12 @@ with tab_bridge:
     if not spec:
         st.info("No design spec yet.")
     else:
-        import plotly.graph_objects as go
+        from src.ui.bridge_view import render_bridge
 
-        layout = spec.get("span_layout") or []
-        L = spec.get("total_length_m", sum(s.get("length_m", 0) for s in layout))
-        depth = spec.get("structural_depth_m") or max((max(
-            (s.get("length_m", 0) for s in layout), default=0
-        ) / 12.0), 1.0)
-        deck_y = depth
-        x_supports = [0.0]
-        x = 0.0
-        for s in layout:
-            x += s.get("length_m", 0)
-            x_supports.append(x)
-
-        fig = go.Figure()
-        # Deck
-        fig.add_trace(go.Scatter(
-            x=[0, L], y=[deck_y, deck_y], mode="lines",
-            line=dict(width=8, color="#444"), name="deck",
-        ))
-        # Piers
-        for xp in x_supports:
-            fig.add_trace(go.Scatter(
-                x=[xp, xp], y=[0, deck_y], mode="lines",
-                line=dict(width=4, color="#888"), showlegend=False,
-            ))
-        # Water
-        fig.add_shape(
-            type="rect", x0=0, x1=L, y0=-2, y1=0,
-            fillcolor="rgba(80,140,200,0.25)", line_width=0,
-        )
-        fig.update_layout(
-            height=320,
-            xaxis_title="Distance along bridge (m)",
-            yaxis_title="Elevation (m)",
-            yaxis=dict(scaleanchor="x", scaleratio=4),
-            margin=dict(l=20, r=20, t=20, b=20),
-        )
+        fig = render_bridge(spec)
         st.plotly_chart(fig, use_container_width=True)
-        st.json(spec, expanded=False)
+        with st.expander("Raw design spec (JSON)"):
+            st.json(spec, expanded=False)
 
 
 # ----- Report ---------------------------------------------------------------

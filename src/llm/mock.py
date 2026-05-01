@@ -90,10 +90,39 @@ def _marshal_kickoff(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
     )
 
 
+_MARSHAL_RECONCILE_BY_PREFIX: dict[str, str] = {
+    "T1": ("Site & geometry consensus: 2 km alignment with 10 spans of ~200 m. "
+           "Approach grades held under 4%. Pier locations clear of the navigation "
+           "channel; abutments on competent ground both banks."),
+    "T2": ("Load profile consensus: HA + 33 t HB live load, 2.5 kN/m² superimposed "
+           "dead, dynamic factor 1.25. Wind reference 38 m/s; seismic peak ground "
+           "acceleration 0.10 g. Fatigue category C for primary girders."),
+    "T3": ("Material selection consensus: weathering steel primary girders for "
+           "durability and minimal maintenance; reinforced-concrete deck slab "
+           "with a polymer wearing course. Lifecycle cost beats painted steel "
+           "by ~12% over 60 years."),
+    "T4": ("Structural system consensus: multi-span cable-stayed with composite "
+           "deck on weathering-steel edge girders; pylon spacing every other "
+           "internal pier. Stay-cable layout fanned, deck depth ~1.5 m."),
+    "T5": ("Aesthetic & elevation consensus: slender deck, tapered concrete "
+           "pylons, asymmetric stay arrangement at navigation pier. Night "
+           "lighting along the pylons; warm-grey palette to age with the "
+           "weathering-steel patina."),
+    "T6": ("Validation prep consensus: span/depth ratios within passable band, "
+           "support count consistent with span layout, lane geometry leaves a "
+           "1.0 m shoulder per side. Dynamic deflection check flagged for "
+           "next stage."),
+    "T7": ("Synthesis brief consensus: brief is internally consistent. "
+           "Recommended next milestones are a wind tunnel review of the deck "
+           "section and a value-engineering review of pylon proportions."),
+}
+
+
 def _marshal_reconcile(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
-    return (
-        f"[mock-marshal {subtask_id}] Reconciled summary: combining contributions, "
-        f"the consensus is recorded as the subtask output."
+    return _MARSHAL_RECONCILE_BY_PREFIX.get(
+        subtask_id,
+        f"[mock-marshal {subtask_id}] Reconciled summary: contributions merged; "
+        f"consensus recorded as the subtask output.",
     )
 
 
@@ -137,12 +166,36 @@ def _reporter(prompt: str, **_: Any) -> str:
 
 
 def _judge(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
+    # Vary per-subtask deterministically so the judge tab looks alive.
+    seed = int(hashlib.sha256(subtask_id.encode()).hexdigest(), 16)
+    rng = np.random.default_rng(seed)
+    clarity = int(6 + rng.integers(0, 4))         # 6..9
+    completeness = int(6 + rng.integers(0, 4))    # 6..9
+    consistency = int(6 + rng.integers(0, 4))     # 6..9
+    rationales = [
+        "Numbers tie back cleanly to upstream load assumptions.",
+        "Reads well; one structural figure could use a sanity-check note.",
+        "Strong on aesthetic guidance, lighter on quantitative justification.",
+        "Geometry and span layout consistent with the alignment brief.",
+        "Material rationale is reasonable; watch concrete creep at long spans.",
+        "Validation inputs cleanly enumerated; nothing left implicit.",
+        "Synthesis brief consolidates upstream summaries without contradiction.",
+        "Lane geometry and deck width tie cleanly to the traffic brief.",
+        "Cost framing is solid; recommend a sensitivity sweep on steel price.",
+        "Edge cases covered (wind, seismic) at conceptual depth; deflection still open.",
+        "Pier spacing logic follows from span layout; foundation type left to next stage.",
+        "Aesthetic narrative aligns with material choice; lighting plan is a follow-up.",
+        "Live-load arithmetic correct; conservative on dynamic factor.",
+        "Set-cover rationale traceable to the skill embeddings retrieved.",
+    ]
+    # Spread rationale across more buckets by mixing in score signal.
+    idx = (seed + clarity * 31 + completeness * 17 + consistency * 7) % len(rationales)
     return json.dumps({
         "subtask_id": subtask_id,
-        "clarity": 7,
-        "completeness": 7,
-        "consistency": 8,
-        "rationale": "Mock judge: contribution is clear, covers the requirements, internally consistent."
+        "clarity": clarity,
+        "completeness": completeness,
+        "consistency": consistency,
+        "rationale": rationales[idx],
     })
 
 

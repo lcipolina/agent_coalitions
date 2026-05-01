@@ -8,7 +8,9 @@
 
 A single Python process that takes a user brief (e.g., *"design a 2 km bridge for 50 cars/h"*), decomposes it into a DAG of subtasks, runs MongoDB Atlas Vector Search + pairwise-complementarity coalition formation to assign 1–3 agents per subtask, lets each coalition collaborate on a Mongo-backed blackboard with a marshal LLM, and synthesises the result into a government-bid-style proposal with two visualisations and a deterministic validation card.
 
-See `MVP_DESIGN.md` for the full spec (it is the contract). See `PLAN.md` for the executable plan. See `GAME_THEORY_PRIMER.md` for the cooperative-game-theory background. See `TODO.md` for the post-hackathon backlog.
+**MongoDB Atlas is live.** All thirteen domain collections and the Atlas Vector Search index are real and exercised on every run. The only thing that can be mocked is the LLM layer (chat + embeddings); when mocked, Atlas Vector Search still runs end-to-end — only the query vector changes from an OpenAI embedding to a deterministic SHA-256-seeded pseudo-embedding. Mock mode is the default for the live demo because it finishes a full pipeline run in under five seconds and never depends on network weather.
+
+For the system design, the rationale behind every interesting choice (skill–agent split, coalition value formula, blackboard protocol, validation ordering, reputation weighting), and the full repository layout, see [ARCHITECTURE.md](ARCHITECTURE.md). The product contract is in `MVP_DESIGN.md`, the executable plan in `PLAN.md`, the cooperative-game-theory background in `GAME_THEORY_PRIMER.md`, and the post-hackathon backlog in `TODO.md`.
 
 ---
 
@@ -103,55 +105,6 @@ OpenAI proper via `OPENAI_EMBEDDING_API_KEY`.
 
 ## Repository layout
 
-```
-app.py                       # Streamlit UI (run with: streamlit run app.py)
-cost_model.json              # EUR unit costs for the surveyor
-src/
-  config.py                  # pydantic-settings; reads .env
-  matching.py                # Atlas $vectorSearch + cosine fallback
-  tokens.py                  # tiktoken count + truncate (200-tok cap)
-  progress.py                # progress event bus for live UI
-  run.py                     # CLI entrypoint
-  llm/
-    mock.py                  # deterministic embeddings + role-keyed chat
-    openai_client.py         # real-mode wrapper; routes by USE_MOCK_LLM
-    prompts.py               # Jinja2 template loader (render(name, **ctx))
-  prompts/                   # *.j2 templates — one per LLM role
-  db/
-    client.py, indexes.py, writes.py, seed.py
-  agents/
-    coalitions.py            # rank-1 Shapley greedy coalition formation
-    set_cover.py             # weighted greedy skill→agent set cover
-    blackboard.py            # post / read coalition_messages
-    marshal.py               # round 0 kickoff + round 2 reconcile
-  pipeline/
-    decomposer.py, execution.py, synthesis.py, validation.py,
-    surveyor.py, reporter.py, reputation.py, orchestrator.py
-  scripts/
-    ingest_skills.py, ping_mongo.py, test_vector_search.py
-tests/
-  test_matching.py, test_coalitions.py, test_validation.py,
-  test_e2e_mock.py           # full pipeline + replay invariants
-```
-
----
-
-## Build status
-
-The project is built gate-by-gate per `PLAN.md`. Each gate corresponds to one git commit and has a single self-check.
-
-| Gate | What | Status |
-|---|---|---|
-| G1 | Conda env reproducible | ✅ done |
-| G2 | Config + secrets wiring | ✅ done |
-| G3 | Mongo connectivity (13 collections + vector index) | ✅ done |
-| G4 | Skills ingested (36 skills, 21 agents) | ✅ done |
-| G5 | Atlas Vector Search live | ✅ done |
-| G6 | Mock pipeline end-to-end (12/12 tests green) | ✅ done |
-| G7 | Real-LLM pipeline end-to-end | deferred (used for demo video) |
-| G8 | Streamlit UI with live progress + 8 tabs + bridge viz | ✅ done |
-| G9 | Replay works (zero LLM calls asserted) | ✅ done |
-| G10 | Reputation persists across runs | ✅ done |
-| G11 | Demo script passes (≤90s) | pending |
+See [ARCHITECTURE.md §10](ARCHITECTURE.md#10-repository-layout). The same document also contains the system-level design rationale behind every non-trivial choice in this codebase.
 
 ---
