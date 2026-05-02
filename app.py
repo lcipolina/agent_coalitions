@@ -1107,4 +1107,3 @@ digraph MongoDB {
         "fabric is what makes the whole thing work as one coherent system.",
         icon="🍃",
     )
-
