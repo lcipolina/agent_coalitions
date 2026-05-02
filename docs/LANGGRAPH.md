@@ -272,7 +272,140 @@ sidebar (toggle: *LangGraph backend*) without restarting. The
 node-to-stage mapping table, so the LangGraph integration is visible
 even before you trigger a run.
 
-## 7. References
+## 7. Is LangGraph adding real value, or is this a toy?
+
+Honest self-assessment, written so we don't have to bluff in the
+pitch: **at the current shape of the pipeline, LangGraph is mostly
+decorative. At realistic scale, it would start earning its keep —
+but only if we adopt several features we currently don't use.**
+
+### 7.1 What we actually use today
+
+Only `StateGraph` + linear `add_edge` + `compile()`. The graph is a
+9-node line. Concretely, today LangGraph delivers:
+
+1. **The Mermaid diagram** in the Workflow tab (visible artefact,
+   judges like it).
+2. **A name to drop in the pitch** (recruiters and judges recognise
+   it).
+3. **A schema-typed shared state object** (`GraphState` TypedDict).
+   Mild benefit — a Pydantic model would do the same.
+
+That is it. A 30-line dispatcher (`for stage in STAGES:
+state = stage(state)`) would produce byte-identical MongoDB rows.
+Calling it a toy at this scale is fair.
+
+### 7.2 Where it would start earning its keep at scale
+
+LangGraph's actual value props are exactly the things we *don't* use
+yet:
+
+#### a. Parallel fan-out over subtasks (`Send` API)
+
+Today subtasks run **sequentially** in `execute_subtask`. At scale
+(say 20 subtasks × 4 LLM calls each = 80 sequential calls) wall-clock
+is ≈ 3 min even with fast models. LangGraph's `Send` natively fans
+out a list of items to the same node in parallel and joins. Without
+LangGraph this is `asyncio.gather` or a `ThreadPoolExecutor` plus
+hand-rolled progress emission, exception aggregation, and partial-
+failure semantics — ~50–100 LoC of bespoke code.
+
+**Verdict: real win at scale.** Wall-clock drops from `sum(subtasks)`
+to `max(subtasks)`.
+
+#### b. Conditional edges (validation retry loops)
+
+Today `validate` runs once and pass/fails. Realistic engineering
+review is iterative: *"fail → re-synthesise with the validation
+feedback → re-validate, up to N times."* In a function pipeline this
+means restructuring the orchestrator. In LangGraph it is one line:
+
+```python
+g.add_conditional_edges(
+    "validate", _route, {"pass": "report", "fail": "synthesise"}
+)
+```
+
+**Verdict: real value as soon as you want any iterative refinement.**
+
+#### c. Checkpointing & resume
+
+Today a crash mid-run loses the run. At hackathon scale, fine. At
+*"100 designs/day, $5/run in real-LLM mode"* scale, a crash on
+subtask 17/20 is $4 down the drain — and resume requires rebuilding
+state from MongoDB by hand. LangGraph has pluggable checkpointers
+that snapshot the full graph state per node. Resume = one line. We
+could even back the checkpointer with our existing MongoDB.
+
+**Verdict: real value once a single run costs more than a dollar.**
+
+#### d. Human-in-the-loop interrupts
+
+Realistic design review needs a human gate (*"approve this material
+spec before continuing"*). LangGraph has native `interrupt_before` /
+`interrupt_after` that pauses the graph and returns control to the
+caller. Bolting that onto a function pipeline means restructuring
+everything.
+
+**Verdict: real value if the product ever needs human approval.**
+
+#### e. Subgraphs / hierarchical composition
+
+If `execute_subtask` itself becomes a graph (kickoff →
+contributions in parallel → reconcile, with retry), nesting graphs
+is trivial in LangGraph. Hand-rolling nested orchestrators is
+painful.
+
+**Verdict: real value once per-subtask collaboration grows.**
+
+#### f. LangSmith observability
+
+Free tracing UI showing every node, state diff, latency, token
+count. Rolling this ourselves ≈ a week of work.
+
+**Verdict: real value, basically free if we adopt LangSmith.**
+
+### 7.3 Where it adds *no* value, even at scale
+
+- **Multi-tenancy / horizontal scaling.** LangGraph runs in one
+  Python process. For *"1000 concurrent runs"* you need a job
+  queue (Celery, Temporal, Cloud Tasks). LangGraph helps with the
+  *shape* of one run, not the scheduling of many.
+- **Cost optimisation.** No prompt caching, batching, or model
+  routing. We built our own `llm_cache` for that.
+- **Provider rate-limit handling.** Your problem, not LangGraph's.
+- **Storage.** Not a database; MongoDB is still doing all the work.
+
+### 7.4 Honest verdict by scale
+
+| Scale | Verdict |
+| --- | --- |
+| Hackathon demo (today) | **Toy.** Nine sequential nodes; a `for stage in STAGES` loop is equivalent. Kept for the Mermaid diagram + the pitch. |
+| Production v1 (parallel subtasks + retry loops + resume) | **Earns its keep.** Replaces ~200 LoC of bespoke async / retry / checkpoint code. |
+| Production v2 (human approval, hierarchical subgraphs, LangSmith) | **Genuinely valuable.** Hard to match without it. |
+| Hyperscale (1000+ concurrent runs, multi-region, SLAs) | **Insufficient on its own.** Wrap it in Temporal / Celery; LangGraph becomes the per-run inner loop. |
+
+### 7.5 If we wanted to stop being decorative — concrete next steps
+
+The single highest-leverage change is **fan-out parallelism over
+subtasks via `Send`**. That single change:
+
+- Reduces wall-clock by ~Nx (N = independent subtasks).
+- Demonstrates a feature genuinely hard to replicate without
+  LangGraph.
+- Makes the Workflow tab visibly different from the function
+  pipeline (the diagram would show a fork/join), which is a much
+  stronger demo moment than *"look, the same line graph but in
+  LangGraph."*
+
+The second-highest is **a conditional retry edge on validation
+failure** — one line of code, instantly justifies the choice in the
+pitch.
+
+Both fit in <100 LoC each and would change the answer to *"is
+LangGraph adding value?"* from *"toy"* to *"real."*
+
+## 8. References
 
 - LangGraph docs: https://langchain-ai.github.io/langgraph/
 - StateGraph API: https://langchain-ai.github.io/langgraph/reference/graphs/
