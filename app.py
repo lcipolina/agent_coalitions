@@ -388,12 +388,12 @@ if metrics:
 
 (
     tab_dag, tab_coal, tab_bb, tab_val, tab_cost, tab_render,
-    tab_report, tab_reput, tab_workflow,
+    tab_report, tab_reput, tab_workflow, tab_mongo,
 ) = st.tabs([
     "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Agent comms", "\u2705 Validation",
     "\U0001f4b6 Cost", "\U0001f3a8 Rendering",
     "\U0001f4c4 Report", "\U0001f4c8 Reputation",
-    "\U0001f578\ufe0f Workflow",
+    "\U0001f578\ufe0f Workflow", "\U0001f343 MongoDB",
 ])
 
 
@@ -989,3 +989,122 @@ with tab_workflow:
             ],
         }
     )
+
+
+# ----- MongoDB --------------------------------------------------------------
+with tab_mongo:
+    st.markdown("#### 🍃  Where does MongoDB fit?")
+    st.caption(
+        "This hackathon is organised by MongoDB, so it's worth being explicit "
+        "about *where* MongoDB sits in this project. Spoiler: in **five** "
+        "distinct places, not one. See [docs/MATCHING_PIPELINE.md](docs/MATCHING_PIPELINE.md) "
+        "for the full walkthrough."
+    )
+
+    _mongo_dot = """
+digraph MongoDB {
+  rankdir=LR;
+  bgcolor="white";
+  pad=0.3;
+  nodesep=0.35;
+  ranksep=0.55;
+  fontname="Helvetica";
+
+  // Defaults
+  node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11
+        margin="0.12,0.07"];
+  edge [color="#4a6fa5" fontsize=9 fontname="Helvetica"];
+
+  // User & prompt
+  user    [label="👤  User", shape=circle fillcolor="#fffbe6" color="#b58900"];
+  prompt  [label="Design prompt\\n(natural language)", fillcolor="#fff3cd" color="#b58900"];
+
+  // Pipeline stages (yellow path)
+  decomp  [label="Decomposer\\n(LLM)", fillcolor="#eaf3ff" color="#4a6fa5"];
+  embed   [label="OpenAI\\nembeddings\\n(1536-d)", fillcolor="#eaf3ff" color="#4a6fa5"];
+  match   [label="Skill matching\\n+ coverage floor\\n+ set-cover", fillcolor="#eaf3ff" color="#4a6fa5"];
+  bb      [label="Blackboard\\ncollaboration", fillcolor="#eaf3ff" color="#4a6fa5"];
+  synth   [label="Synthesise →\\nValidate →\\nCost → Report", fillcolor="#eaf3ff" color="#4a6fa5"];
+  rep     [label="Shapley\\n+ reputation\\nupdate", fillcolor="#eaf3ff" color="#4a6fa5"];
+
+  // MongoDB roles (green leaves)
+  m_vec   [label="① Vector search\\nskills + Atlas index\\nskills_embedding_vector",
+           fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
+  m_cat   [label="② Catalog\\nskills, agents",
+           fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
+  m_bus   [label="③ Message bus\\ncoalition_messages",
+           fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
+  m_ledg  [label="④ Assignment ledger\\nruns, subtasks, assignments,\\ndesign_specs, validation_results,\\ncost_estimates, artifacts, events",
+           fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
+  m_mem   [label="⑤ Persistent memory\\nagents.reputation,\\nreputation_updates",
+           fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
+
+  // Output
+  out     [label="Design brief\\n(report + 3D + cost)", fillcolor="#fff3cd" color="#b58900"];
+
+  // Edges
+  user   -> prompt;
+  prompt -> decomp;
+  decomp -> embed [label="subtask\\ncapabilities"];
+  embed  -> match [label="query\\nvector"];
+  match  -> m_vec [label="$vectorSearch", style="dashed"];
+  m_vec  -> match [style="dashed"];
+  match  -> m_cat [label="lookup\\nagents", style="dashed"];
+  m_cat  -> match [style="dashed"];
+  match  -> bb;
+  bb     -> m_bus [label="append", style="dashed"];
+  bb     -> synth;
+  synth  -> m_ledg [label="persist", style="dashed"];
+  synth  -> rep;
+  rep    -> m_mem [label="update", style="dashed"];
+  rep    -> out;
+}
+""".strip()
+
+    st.graphviz_chart(_mongo_dot, use_container_width=True)
+
+    st.markdown("---")
+    st.markdown("#### The \"MongoDB does five things\" cheat-sheet")
+    st.table(
+        {
+            "Role": [
+                "① Vector search",
+                "② Catalog",
+                "③ Message bus",
+                "④ Assignment ledger",
+                "⑤ Persistent memory",
+            ],
+            "Collection / index": [
+                "skills + Atlas index `skills_embedding_vector`",
+                "skills, agents",
+                "coalition_messages",
+                "runs, subtasks, assignments, design_specs, validation_results, cost_estimates, artifacts, events",
+                "agents.reputation, reputation_updates",
+            ],
+            "What it stores": [
+                "70 skills × 1536-d cosine embeddings (semantic skill index)",
+                "Skill metadata, agent rosters with `skill_ids`",
+                "Append-only blackboard, indexed `(run_id, subtask_id, ts)`",
+                "Every team formed, every output, every cost — the *replay surface*",
+                "Per-run delta + running reputation across all runs",
+            ],
+            "Used by": [
+                "Skill matching pipeline (`src/pipeline/matching.py`)",
+                "Set-cover → agent assignment",
+                "Blackboard collaboration loop",
+                "All pipeline stages + the Replay button",
+                "Reputation stage + future-run priors",
+            ],
+        }
+    )
+
+    st.markdown("---")
+    st.info(
+        "**The point:** removing MongoDB removes **five capabilities**, not one. "
+        "It's not a passive store — it's the catalog, the vector index, the "
+        "message bus, the audit log, and the cross-run memory. Every other piece "
+        "of the system (LangGraph, OpenAI, Streamlit) is replaceable; the data "
+        "fabric is what makes the whole thing work as one coherent system.",
+        icon="🍃",
+    )
+
