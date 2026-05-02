@@ -86,7 +86,10 @@ def embed(text: str) -> list[float]:
     """Return an embedding for ``text`` (mocked when ``USE_MOCK_LLM=true``).
 
     Real-mode results are cached per-process on (model, text) so the same
-    string is only embedded once.
+    string is only embedded once. When ``settings.use_llm_cache=True`` an
+    additional MongoDB-backed cache (`llm_cache` collection) survives
+    across processes and runs; cache hits do **not** bump the call
+    counter.
     """
     if settings.use_mock_llm:
         return _mock.embed(text)
@@ -94,12 +97,18 @@ def embed(text: str) -> list[float]:
     cached = _embed_cache.get(key)
     if cached is not None:
         return cached
+    # Persistent cache hit?
+    persisted = _cache_get("embed", settings.openai_embedding_model, text)
+    if persisted is not None:
+        _embed_cache[key] = persisted
+        return persisted
     _bump()
     resp = _embedding_client().embeddings.create(
         model=settings.openai_embedding_model, input=text
     )
     vec = resp.data[0].embedding
     _embed_cache[key] = vec
+    _cache_put("embed", settings.openai_embedding_model, text, vec)
     return vec
 
 
@@ -108,13 +117,90 @@ def chat(prompt: str, role: str = "agent", **kwargs: Any) -> str:
 
     ``role`` is forwarded to the mock router so each pipeline stage gets a
     role-appropriate stub; in real mode it is unused (a single user-message
-    completion is sent).
+    completion is sent). When ``settings.use_llm_cache=True`` responses
+    are cached in the ``llm_cache`` MongoDB collection keyed by a
+    deterministic hash of (model, role, prompt); cache hits do **not**
+    bump the call counter.
     """
     if settings.use_mock_llm:
         return _mock.chat(prompt, role=role, **kwargs)
+    cache_payload = f"{role}\x1f{prompt}"
+    persisted = _cache_get("chat", settings.openai_chat_model, cache_payload)
+    if persisted is not None:
+        return persisted
     _bump()
     resp = _chat_client().chat.completions.create(
         model=settings.openai_chat_model,
         messages=[{"role": "user", "content": prompt}],
     )
-    return resp.choices[0].message.content or ""
+    out = resp.choices[0].message.content or ""
+    _cache_put("chat", settings.openai_chat_model, cache_payload, out)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# MongoDB-backed LLM response cache (settings.use_llm_cache).
+# ---------------------------------------------------------------------------
+# Keyed by sha256 of (kind, model, payload). ``payload`` is the input
+# text for embeddings and ``f"{role}\x1f{prompt}"`` for chat. Cache hits
+# do not bump the call counter, preserving its meaning ("real API calls
+# made") and the G9 replay invariant.
+
+import hashlib  # noqa: E402  — kept near the cache helpers
+
+
+def _cache_key(kind: str, model: str, payload: str) -> str:
+    h = hashlib.sha256()
+    h.update(kind.encode("utf-8"))
+    h.update(b"\x1e")
+    h.update(model.encode("utf-8"))
+    h.update(b"\x1e")
+    h.update(payload.encode("utf-8"))
+    return h.hexdigest()
+
+
+def _cache_get(kind: str, model: str, payload: str) -> Any | None:
+    if not settings.use_llm_cache:
+        return None
+    try:
+        from src.db.client import get_db
+
+        row = get_db().llm_cache.find_one(
+            {"cache_key": _cache_key(kind, model, payload)},
+            {"_id": 0, "response": 1},
+        )
+    except Exception as exc:  # noqa: BLE001 — cache must never fail the pipeline
+        log.warning("llm_cache read failed: %s", exc)
+        return None
+    return row["response"] if row else None
+
+
+def _cache_put(kind: str, model: str, payload: str, response: Any) -> None:
+    if not settings.use_llm_cache:
+        return
+    try:
+        from datetime import datetime, timezone
+
+        from src.db.client import get_db
+
+        get_db().llm_cache.update_one(
+            {"cache_key": _cache_key(kind, model, payload)},
+            {
+                "$set": {
+                    "kind": kind,
+                    "model": model,
+                    "response": response,
+                    "updated_at": datetime.now(timezone.utc),
+                    # Truncated preview of the input so the collection is
+                    # human-browsable in Atlas Data Explorer / Compass.
+                    "preview": payload[:160],
+                },
+                "$setOnInsert": {
+                    "created_at": datetime.now(timezone.utc),
+                },
+                "$inc": {"hits": 0},
+            },
+            upsert=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("llm_cache write failed: %s", exc)

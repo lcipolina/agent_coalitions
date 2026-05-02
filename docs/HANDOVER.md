@@ -187,9 +187,9 @@ These are deliberately deferred from the 1-day MVP. Live status in [docs/TODO.md
 - [ ] Replace hand-authored `data/skills_seed.json` (~70 entries) with **150 real skills.sh entries**. (See brief Q2.)
 - [ ] **Add parity tests for the LLM judge.** *Both* judges already exist in production: the mock judge in [src/llm/mock.py](../src/llm/mock.py) (`_judge`) and the real LLM judge in [src/pipeline/validation.py](../src/pipeline/validation.py) (calls `chat(role="judge")`). What is missing is *automated parity tests* that exercise both and assert their output shape and score ranges agree. This is purely test-coverage work; the runtime path is fine.
 - [ ] §11.2 strategy comparison (A: random, B: top-by-reputation, C: our mechanism) — would need gate **G12**.
-- [ ] AI hero render via OpenAI image API + "Concept render" tab — would need gate **G13**. The user mentioned this is interesting for non-bridge designs (rollercoaster, plane).
+- [x] **AI hero render via OpenAI image API + "Concept render" tab — gate G13.** Done on branch `langgraph`. Stage module [src/pipeline/concept_render.py](../src/pipeline/concept_render.py) plus an on-demand Streamlit tab. Real mode calls `gpt-image-1`; mock mode (and any API failure) falls back to a deterministic SVG placeholder so the demo never blanks out. Persisted as `artifacts.kind="concept_render"`, replayable like every other artifact. Idempotent per run.
 - [ ] Tighten validator: dynamic-load factor, fatigue check stub, deflection limit.
-- [ ] Cache LLM responses in a Mongo `llm_cache` collection (currently skipped).
+- [x] **Cache LLM responses in a Mongo `llm_cache` collection.** Done on branch `langgraph`. Opt-in via `USE_LLM_CACHE` (default on). Applies to chat + embeddings; cache hits do **not** bump the LLM call counter, preserving the G9 replay invariant. Cache key = sha256 of (kind, model, role+prompt).
 - [ ] Runtime assertion that no `chat()` call goes out when `settings.use_mock_llm=True`.
 - [x] **Implement LangGraph in another branch.** Done on branch `langgraph` (commits `3ab7ff8` + `208111d`). Parallel implementation in [src/pipeline/orchestrator_lg.py](../src/pipeline/orchestrator_lg.py) behind a runtime flag; sidebar toggle, status badge, and a *🕸️ Workflow* tab that renders the compiled graph as a Mermaid diagram. 14/14 tests pass against both backends. See [docs/LANGGRAPH.md](LANGGRAPH.md). The migration plan in §12 below is preserved as a record of how the port was scoped.
 - [ ] Hard-FAIL validation category (currently warnings only).
@@ -228,7 +228,7 @@ The aspect-ratio formula generalises: rollercoasters, towers, planes all render 
 
 Outstanding rendering work:
 
-- AI hero render (OpenAI image API) for non-bridge designs — wishlist.
+- AI hero render (OpenAI image API) — done on `langgraph` branch (see §6.2).
 - Real-mode LLM Visualiser path is implemented (`src/pipeline/visualiser.py` calls `chat(role="visualiser")`) but falls back to deterministic builders on parse/validation error. Expand the schema-shaped prompt for tower/dam/coaster if you want richer LLM-generated geometry.
 
 ---

@@ -305,10 +305,20 @@ Use LangGraph for the orchestrator. **Escape hatch:** if LangGraph wiring blocks
 
 ## Nice to have (polish / future)
 
-- [ ] AI hero render (gate G13) — OpenAI image API for non-bridge
-      designs (rollercoaster, plane, tower).
-- [ ] Cache LLM responses in a Mongo `llm_cache` collection (currently
-      skipped). Cuts real-mode demo cost and latency.
+- [x] **AI hero render (gate G13)** — OpenAI image API for any design
+      domain (bridge, rollercoaster, tower, etc.). Implemented on the
+      `langgraph` branch as `src/pipeline/concept_render.py` plus a
+      "Concept render" Streamlit tab. On-demand (not part of the
+      default run because each call is ~5–10 cents and 10–20 s).
+      Mock-mode falls back to a deterministic SVG placeholder so the
+      live demo never blanks out. Persisted as an `artifacts` row of
+      kind `concept_render` and replayable.
+- [x] **Cache LLM responses in a Mongo `llm_cache` collection.**
+      Implemented on the `langgraph` branch. Opt-in via
+      `USE_LLM_CACHE` (default on); applies to chat + embeddings.
+      Cache key is sha256 of (kind, model, role+prompt). Cache hits
+      do **not** bump the LLM call counter, so the G9 replay
+      invariant is preserved.
 ```
 
 ---
