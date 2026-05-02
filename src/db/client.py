@@ -26,6 +26,7 @@ COLLECTIONS: tuple[str, ...] = (
     "artifacts",
     "events",
     "reputation_updates",
+    "llm_cache",
 )
 
 

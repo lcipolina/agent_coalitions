@@ -268,9 +268,9 @@ Use LangGraph for the orchestrator. **Escape hatch:** if LangGraph wiring blocks
 - [ ] Replace hand-authored data/skills_seed.json (~30–50 entries) with 150 real skills.sh entries.
 - [ ] Replace mock LLM judge with real LLM judge in mock-mode parity tests.
 - [ ] Run §11.2 strategy comparison (A/B/C) — implement gate G12.
-- [ ] AI hero render (gate G13).
+- [x] AI hero render (gate G13). *(Done on `feat/concept-render-and-cache` branch — `src/pipeline/concept_render.py`, on-demand UI tab, mock-mode SVG placeholder.)*
 - [ ] Tighten validator: include dynamic-load factor, fatigue check stub.
-- [ ] Cache LLM responses in Mongo `llm_cache` collection (currently skipped).
+- [x] Cache LLM responses in Mongo `llm_cache` collection. *(Done on `feat/concept-render-and-cache` branch — opt-in via `USE_LLM_CACHE`; cache hits do not bump the LLM call counter, preserving G9 replay semantics.)*
 ```
 
 ---

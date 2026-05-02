@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Pipeline
     use_mock_llm: bool = Field(True, alias="USE_MOCK_LLM")
+    use_llm_cache: bool = Field(True, alias="USE_LLM_CACHE")
     seed: int = Field(42, alias="SEED")
 
 

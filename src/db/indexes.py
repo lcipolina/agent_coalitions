@@ -50,6 +50,13 @@ def ensure_regular_indexes(db: Database) -> None:
     db.reputation_updates.create_index([("agent_id", ASCENDING)])
     db.reputation_updates.create_index([("run_id", ASCENDING)])
 
+    # llm_cache: keyed by deterministic hash of (kind, model, prompt/text).
+    # Optional collection — only used when ``settings.use_llm_cache=True``
+    # and ``USE_MOCK_LLM=false``. Cache hits do not bump the LLM call
+    # counter (the call counter measures real API calls).
+    db.llm_cache.create_index([("cache_key", ASCENDING)], unique=True)
+    db.llm_cache.create_index([("kind", ASCENDING), ("model", ASCENDING)])
+
 
 def ensure_vector_index(db: Database) -> bool:
     """Create Atlas Vector Search index on skills.embedding (idempotent).

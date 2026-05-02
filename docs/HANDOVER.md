@@ -185,9 +185,9 @@ These are deliberately deferred from the 1-day MVP. Live status in [docs/TODO.md
 - [ ] Replace hand-authored `data/skills_seed.json` (~70 entries) with **150 real skills.sh entries**. (See brief Q2.)
 - [ ] Replace mock LLM judge with the real LLM judge in mock-mode parity tests. The mock currently returns templated mid scores so the radar chart populates.
 - [ ] §11.2 strategy comparison (A: random, B: top-by-reputation, C: our mechanism) — would need gate **G12**.
-- [ ] AI hero render via OpenAI image API + "Concept render" tab — would need gate **G13**. The user mentioned this is interesting for non-bridge designs (rollercoaster, plane).
+- [x] **AI hero render via OpenAI image API + "Concept render" tab — gate G13.** Done on branch `feat/concept-render-and-cache`. Stage module [src/pipeline/concept_render.py](../src/pipeline/concept_render.py) plus an on-demand Streamlit tab. Real mode calls `gpt-image-1`; mock mode (and any API failure) falls back to a deterministic SVG placeholder so the demo never blanks out. Persisted as `artifacts.kind="concept_render"`, replayable like every other artifact. Idempotent per run.
 - [ ] Tighten validator: dynamic-load factor, fatigue check stub, deflection limit.
-- [ ] Cache LLM responses in a Mongo `llm_cache` collection (currently skipped).
+- [x] **Cache LLM responses in a Mongo `llm_cache` collection.** Done on branch `feat/concept-render-and-cache`. Opt-in via `USE_LLM_CACHE` (default on). Applies to chat + embeddings; cache hits do **not** bump the LLM call counter, preserving the G9 replay invariant. Cache key = sha256 of (kind, model, role+prompt).
 - [ ] Runtime assertion that no `chat()` call goes out when `settings.use_mock_llm=True`.
 - [ ] **Implement LangGraph in another branch.** The brief asks for LangGraph. We currently use a hand-rolled orchestrator in [src/pipeline/orchestrator.py](src/pipeline/orchestrator.py) because LangGraph's state-graph API was overhead we couldn't justify in 1 day. The user explicitly wants this ported as a follow-up branch. **See §12 of this doc for a concrete migration plan.**
 - [ ] Hard-FAIL validation category (currently warnings only).
@@ -226,7 +226,7 @@ The aspect-ratio formula generalises: rollercoasters, towers, planes all render 
 
 Outstanding rendering work:
 
-- AI hero render (OpenAI image API) for non-bridge designs — wishlist.
+- AI hero render (OpenAI image API) — done on `langgraph` branch (see §6.2).
 - Real-mode LLM Visualiser path is implemented (`src/pipeline/visualiser.py` calls `chat(role="visualiser")`) but falls back to deterministic builders on parse/validation error. Expand the schema-shaped prompt for tower/dam/coaster if you want richer LLM-generated geometry.
 
 ---
