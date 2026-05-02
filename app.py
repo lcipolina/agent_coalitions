@@ -196,7 +196,7 @@ with st.sidebar:
 st.title("🔮  Agent Teams — Conceptual Design")
 st.caption(
     "Multi-agent team formation over a MongoDB Atlas Vector Search "
-    "skills index. Mock mode is fully deterministic and runs in seconds."
+    "skills index."
 )
 # Inline backend badge so it's visible from the main pane (not just the
 # sidebar). Flip it from the sidebar toggle.
@@ -351,9 +351,8 @@ if run_clicked:
 # Tabs (only meaningful once a run_id exists)
 # ----------------------------------------------------------------------------
 if st.session_state.run_id is None:
-    st.info("Click **Run pipeline** above to start. Default prompt is "
-            "pre-filled. The 8 tabs below populate from MongoDB once a "
-            "run completes.")
+    st.info("Click **Run pipeline** above to start. "
+            "The 8 tabs below populate from MongoDB once a run completes.")
     st.stop()
 
 run_id = st.session_state.run_id
@@ -470,7 +469,7 @@ with tab_dag:
         st.dataframe(
             [{
                 "id": s["subtask_id"], "title": s["title"],
-                "deps": ", ".join(s.get("depends_on", [])),
+                "dependencies": ", ".join(s.get("depends_on", [])),
                 "status": s["status"],
                 "capabilities": ", ".join(s.get("required_capabilities", [])),
             } for s in subtasks],
