@@ -1,0 +1,17 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+.DS_Store
+_docx_extract/
+GAME_THEORY_PRIMER.md
+agent_market_mvp_implementation_brief.docx
+.gitignore
+workflow.txt
+~$ent_market_mvp_implementation_brief.docx
+demo_prompts.txt
+pitch.md
+
+# Editor
+.vscode/
