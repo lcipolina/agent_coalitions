@@ -12,6 +12,11 @@ goal is to prove G6 invariants hold byte-identically through LangGraph:
 """
 from __future__ import annotations
 
+import pytest
+
+# Skip the whole module if the optional langgraph package isn't installed.
+pytest.importorskip("langgraph")
+
 from src.core.config import settings
 from src.core.tokens import count_tokens
 from src.db.client import get_db
