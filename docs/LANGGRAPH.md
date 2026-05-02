@@ -46,7 +46,7 @@ benefits:
    abstraction matches what we already do with MongoDB's `runs` and
    `events` rows. The migration is a natural place to clean up the
    replay path long-term — though we **do not** turn on the checkpointer
-   in this PR (see §5.4).
+   in this PR (see §5.5).
 
 ## 3. What it gives us (concretely)
 
@@ -195,7 +195,7 @@ stage function and packaging its return value into a partial state.
 
 ### 5.3 What is preserved
 
-- All 12 existing tests pass.
+- All existing tests pass (14/14 with the two new LangGraph tests).
 - The mock-mode demo works without an OpenAI key.
 - MongoDB row shape identical (assignments, coalition_messages,
   subtask_outputs, design_specs, validation_results, cost_estimates,
@@ -205,7 +205,34 @@ stage function and packaging its return value into a partial state.
 - Replay (`G9` invariant: zero LLM calls on replay) is unchanged. It
   stays in the function backend; LangGraph is only for live runs.
 
-### 5.4 What is deliberately out of scope (future work)
+### 5.4 Visible in the demo UI
+
+LangGraph is not just behind the curtain — the Streamlit app surfaces
+it in three places so demo audiences can see the integration:
+
+1. **Sidebar toggle.** A *LangGraph backend* switch (next to the
+   *Mock LLM* toggle) flips `settings.use_langgraph` for the live
+   session. No restart needed; the next *Run pipeline* click goes
+   through the chosen backend. Disabled while a run is in flight.
+2. **Status badge.** Right under the toggle a coloured pill shows
+   either `🕸️ Pipeline: LangGraph (StateGraph)` or
+   `🧵 Pipeline: function (plain Python)`. The same label is repeated
+   under the page title so it stays in view when the sidebar is
+   collapsed.
+3. **🕸️ Workflow tab.** A new tab renders the compiled graph as a
+   Mermaid diagram (via `graph.get_graph().draw_mermaid()` + mermaid.js
+   from CDN). Below the diagram, a table maps each node to the stage
+   function it wraps and the MongoDB collections it writes to. The
+   tab is available regardless of which backend is active — when the
+   function backend is selected the diagram still shows the canonical
+   structure both backends share.
+
+In other words: when you flip the sidebar toggle and run the pipeline,
+the badge changes, the *Workflow* tab confirms the active backend, and
+every other tab works exactly as before because the LangGraph nodes
+call the same stage functions.
+
+### 5.5 What is deliberately out of scope (future work)
 
 - `Checkpointer` (SQLite/Postgres). MongoDB already persists every
   artifact; adding a second store is redundant and a foot-gun.
@@ -238,6 +265,12 @@ USE_LANGGRAPH=true conda run -n coalitions python -m src.run
 # tests — both backends
 conda run -n coalitions pytest tests/ -q
 ```
+
+You can also flip the backend **at runtime** from the Streamlit
+sidebar (toggle: *LangGraph backend*) without restarting. The
+*🕸️ Workflow* tab renders the compiled graph as a Mermaid diagram +
+node-to-stage mapping table, so the LangGraph integration is visible
+even before you trigger a run.
 
 ## 7. References
 

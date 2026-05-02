@@ -414,4 +414,3 @@ def build_graph():
 - Do not wire LLM calls into LangGraph's tool-calling abstractions. Our LLM client (`src/llm/openai_client.py`) is already a clean seam with mock-mode fallback. LangGraph is the *workflow engine*, not the LLM router.
 - Do not add LangChain `Runnable` chains around the nodes "for consistency". They add a 100ms-per-step overhead and obscure the call graph.
 - Do not touch [src/agents/coalitions.py](src/agents/coalitions.py) (the maths) or [src/pipeline/execution.py](src/pipeline/execution.py) (the matching loop) at all. They are orthogonal to orchestration.
-

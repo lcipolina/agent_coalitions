@@ -21,13 +21,27 @@ import streamlit as st  # noqa: E402
 
 from src.core.config import settings  # noqa: E402
 from src.db.client import get_db  # noqa: E402
-# Pick the pipeline backend at import time. The LangGraph backend is a
-# parallel implementation behind the USE_LANGGRAPH flag — see
-# docs/LANGGRAPH.md. Both backends expose the same run_pipeline() shape.
-if settings.use_langgraph:  # noqa: E402
-    from src.pipeline.orchestrator_lg import run_pipeline  # noqa: E402
-else:  # noqa: E402
-    from src.pipeline.orchestrator import run_pipeline  # noqa: E402
+# Both pipeline backends are imported up-front so the sidebar toggle can
+# switch between them at runtime without a Streamlit restart. The backend
+# dispatch happens inside ``run_pipeline`` below; see docs/LANGGRAPH.md.
+from src.pipeline.orchestrator import run_pipeline as _run_pipeline_fn  # noqa: E402
+from src.pipeline.orchestrator_lg import (  # noqa: E402
+    build_graph as _build_lg_graph,
+    run_pipeline as _run_pipeline_lg,
+)
+
+
+def run_pipeline(prompt: str):
+    """Dispatch to the backend selected by ``settings.use_langgraph``.
+
+    Reading the flag at call time (not import time) lets the sidebar
+    toggle flip backends without restarting Streamlit.
+    """
+    if settings.use_langgraph:
+        return _run_pipeline_lg(prompt)
+    return _run_pipeline_fn(prompt)
+
+
 from src.core.progress import set_listener  # noqa: E402
 
 st.set_page_config(
@@ -131,6 +145,34 @@ with st.sidebar:
             icon="⚠️",
         )
 
+    # ------------------------------------------------------------------
+    # Pipeline backend toggle (function vs LangGraph)
+    # ------------------------------------------------------------------
+    if "lg_toggle" not in st.session_state:
+        st.session_state.lg_toggle = bool(settings.use_langgraph)
+
+    lg_on = st.toggle(
+        "LangGraph backend",
+        value=st.session_state.lg_toggle,
+        help=(
+            "OFF = plain function pipeline (src/pipeline/orchestrator.py).\n"
+            "ON  = LangGraph StateGraph (src/pipeline/orchestrator_lg.py).\n"
+            "Both produce identical MongoDB rows; switch any time."
+        ),
+        disabled=st.session_state.running,
+    )
+    if lg_on != st.session_state.lg_toggle:
+        st.session_state.lg_toggle = lg_on
+        settings.use_langgraph = lg_on
+        os.environ["USE_LANGGRAPH"] = "true" if lg_on else "false"
+
+    # Visible status badge so judges can see at a glance which engine is
+    # orchestrating the run.
+    if lg_on:
+        st.success("🕸️  Pipeline: **LangGraph** (StateGraph)", icon="🕸️")
+    else:
+        st.info("🧵  Pipeline: **function** (plain Python)", icon="🧵")
+
     st.write(f"**Mongo DB:** `{settings.mongodb_db}`")
     st.divider()
     st.header("📜  History")
@@ -156,6 +198,14 @@ st.caption(
     "Multi-agent team formation over a MongoDB Atlas Vector Search "
     "skills index. Mock mode is fully deterministic and runs in seconds."
 )
+# Inline backend badge so it's visible from the main pane (not just the
+# sidebar). Flip it from the sidebar toggle.
+_backend_label = (
+    "🕸️ **LangGraph** orchestrator"
+    if settings.use_langgraph
+    else "🧵 **function** orchestrator"
+)
+st.caption(f"Pipeline engine: {_backend_label} — see *Workflow* tab.")
 
 prompt = st.text_input("Design prompt", value=DEFAULT_PROMPT)
 run_col, _ = st.columns([1, 5])
@@ -328,9 +378,11 @@ if metrics:
 
 (
     tab_dag, tab_coal, tab_bb, tab_val, tab_cost, tab_render, tab_report, tab_reput,
+    tab_workflow,
 ) = st.tabs([
     "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Agent comms", "\u2705 Validation",
     "\U0001f4b6 Cost", "\U0001f3a8 Rendering", "\U0001f4c4 Report", "\U0001f4c8 Reputation",
+    "\U0001f578\ufe0f Workflow",
 ])
 
 
@@ -816,3 +868,87 @@ with tab_reput:
             "pass_with_warnings / fail` validation outcome and "
             "`load_factor = len(subtasks_participated) / total_subtasks`."
         )
+
+
+# ----- Workflow (LangGraph DAG visualisation) -------------------------------
+with tab_workflow:
+    st.markdown("#### 🕸️  Pipeline workflow graph")
+    st.caption(
+        "Compiled `langgraph.StateGraph` from "
+        "[`src/pipeline/orchestrator_lg.py`](src/pipeline/orchestrator_lg.py). "
+        "Both backends (function and LangGraph) execute the same 11 stages "
+        "in this order — when the LangGraph toggle is ON, this graph is "
+        "what actually drives the run; when OFF, it documents the "
+        "equivalent function-pipeline structure."
+    )
+    backend_now = (
+        "🕸️ LangGraph (live)" if settings.use_langgraph
+        else "🧵 function pipeline (LangGraph diagram below shown for reference)"
+    )
+    st.info(f"Active backend: **{backend_now}**")
+
+    try:
+        _g = _build_lg_graph()
+        _mermaid_src = _g.get_graph().draw_mermaid()
+    except Exception as exc:  # pragma: no cover — surfacing the error helps
+        st.error(f"Could not build LangGraph diagram: {exc}")
+        _mermaid_src = ""
+
+    if _mermaid_src:
+        # Render via mermaid.js loaded from CDN inside an HTML component.
+        # Avoids extra Python deps and works without the mermaid.ink PNG
+        # service (which would require network egress at render time).
+        import streamlit.components.v1 as components
+
+        _html = f"""
+        <div class=\"mermaid\" style=\"background:#fff;padding:16px;border-radius:8px;\">
+{_mermaid_src}
+        </div>
+        <script src=\"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js\"></script>
+        <script>mermaid.initialize({{ startOnLoad: true, theme: 'default' }});</script>
+        """
+        components.html(_html, height=720, scrolling=True)
+
+        with st.expander("Mermaid source"):
+            st.code(_mermaid_src, language="mermaid")
+
+    st.markdown("---")
+    st.markdown(
+        "**Node \u2192 stage function mapping** "
+        "(see [docs/LANGGRAPH.md](docs/LANGGRAPH.md) \u00a74)"
+    )
+    st.table(
+        {
+            "Node": [
+                "ensure_run", "decompose", "validator_spec", "execute",
+                "synthesise", "validate", "estimate", "visualise",
+                "report", "reputation", "finalise",
+            ],
+            "Stage function": [
+                "_run_utils.ensure_run",
+                "decomposer.decompose",
+                "validator_spec.derive_validation_spec",
+                "execution.execute_subtask (loop over subtasks)",
+                "synthesis.synthesise",
+                "validation.validate",
+                "surveyor.estimate",
+                "visualiser.build_geometry",
+                "reporter.build_report",
+                "reputation.apply_run_reputations",
+                "_run_utils.finalise_run",
+            ],
+            "Writes to MongoDB": [
+                "runs, events",
+                "subtasks, events",
+                "runs.validation_spec, events",
+                "assignments, coalition_messages, subtask_outputs, events",
+                "design_specs, events",
+                "validation_results, events",
+                "cost_estimates, events",
+                "artifacts (geometry_json), events",
+                "artifacts (final_report_md), runs.final_report_md, events",
+                "reputation_updates, agents.reputation, events",
+                "runs (status=completed), events",
+            ],
+        }
+    )
