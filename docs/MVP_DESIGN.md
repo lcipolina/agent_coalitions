@@ -1,62 +1,30 @@
 # Capability-Search-Based Delegation System for Multi-Agent Collaboration — MVP Design
 
-> **Hackathon:** MongoDB London — Multi-Agent Collaboration track
-> **Source:** https://cerebralvalley.ai/e/mongo-db-london-hackathon/details
-> **Build window:** 1 day
-> **Audience:** Hackathon judges + technical reviewers
-> **Status:** Methodology locked. Amendments dated 2026-05-01 applied (see block below). This document is the contract for the coding agent.
 >
-> **Note on terminology.** Earlier drafts of this brief called the system a "market". On reflection that word overstates what we build (no prices, no private information, no incentive compatibility). The accurate name is **capability-search-based delegation system**, with the closest legitimate academic analogy being a **one-sided matching mechanism**. The word *market* is **no longer used** anywhere in current usage — UI, code, DB, narration. Appendix A retains the historical discussion of why we don't use it.
+> **Note on terminology.** Earlier drafts of this brief called the system a "market". On reflection that word overstates what we build (no prices, no private information, no incentive compatibility). The accurate name is **capability-search-based delegation system**, with the closest legitimate academic analogy being a **one-sided matching mechanism**. Appendix A retains the historical discussion of why we don't use it.
 
 ---
+## Overarching Premise — Multi-Agent Collaboration
 
-## Amendments 2026-05-01
-
-Lead-confirmed amendments resolving every ambiguity flagged during planning (the planning doc has since been retired — see git history). Where this block conflicts with the body of the document, **this block wins**.
-
-1. **Naming (Q21).** The word "market" is banned in current usage. DB name `agent_market` → **`agent_coalitions`**. Conda env `agent-market` → **`coalitions`**. Project / app title "Agent Market" → **"Agent Coalitions"**. Streamlit tab #2 "Agent Market" → **"Assignments"** (tab #3 "Coalitions" unchanged). Run button "Run Agent Market" → **"Run Coalitions"**. §10 narration drops the "agent market for short" phrasing. Appendix A retained as historical discussion.
-2. **Summary token cap (Q1).** Standardised on **≤ 200 tokens** for `subtask_outputs.summary` everywhere. Truncation via `tiktoken`.
-3. **Algorithm definitions filled in (§4.2; Q3, Q4, Q5).** `coverage(s, q) = clip(cosine(emb(s), emb(q)), 0, 1)`. `prior_reputation(s)` = min-max normalisation across the catalog of `0.5·log(1+installs) + 0.5·log(1+stars)`. The γ term reads `log(1+installs(s)) / log(1+max_installs_in_catalog)`, ∈ [0,1].
-4. **Default 7-subtask DAG (§4.1; Q6).** Used as decomposer fallback and by mock decomposer: T1 Site & geometry; T2 Load profile; T3 Material selection (deps T1,T2); T4 Structural system (deps T1,T2,T3); T5 Aesthetic & elevation guidance (deps T1,T4); T6 Validation prep (deps T3,T4); T7 Final synthesis brief (deps all).
-5. **Marshal (§13; Q7).** Single shared synthetic marshal `agent_id = "agent_synthetic_marshal"` for v1.
-6. **Validator checks (§4.6 / §3.9; Q8).** Minimum five: `span_to_depth_ratio`, `support_count_consistency`, `live_load_arithmetic`, `material_span_plausibility`, `lane_geometry`. Specific thresholds in `src/pipeline/validation.py`.
-7. **Cost model (Q9).** Hand-picked unit prices in `cost_model.json`. Currency tag `EUR` retained per spec; values reasonable US-style (steel $3,500/t, weathering steel $4,000/t, concrete $180/m³, deck slab $350/m², piers $150,000 each, abutments $220,000 each, finishing premium 10%, contingency 15%).
-8. **Schema additions (Q10, Q11, Q24).** `validation_results` gains `judge_scores: [{subtask_id, clarity, completeness, consistency, rationale}]`. `runs` gains `config: {seed, git_sha, use_mock_llm}` (top-level `runs.use_mock_llm` collapsed into config). `runs.summary_metrics.estimated_cost_eur` is a denormalised copy of `cost_estimates.total`.
-9. **Blackboard simplification (§4.5; Q23).** Coalition agents post in **parallel** in round 1, seeing only the marshal kickoff and upstream `subtask_outputs.summary`. Agents do not see each other's contributions in round 1. Marshal then reconciles in round 2; one optional revision round (round 3) follows if conflict flagged.
-10. **Replay verification (Q13).** `src/llm/openai_client.py` exposes a process-local call counter; replay path resets it then asserts `== 0` at end. Replay events are tagged `kind: "replay"`.
-11. **Vector index creation (Q14).** `src/db/indexes.py` calls `database.create_search_index(...)`. Soft-fail with explicit error if cluster lacks Atlas Search.
-12. **Disclaimer string (Q22).** Canonical text used verbatim everywhere: *"Conceptual design produced by an experimental multi-agent system. Not certified engineering. Not for construction."*
-13. **Synthetic agent population (§3.2; Q17).** 20 agents: 14 with 2 skills, 4 with 3 skills, 2 with 4 skills.
-14. **Orchestrator (Q20).** LangGraph, with pre-approved escape hatch to a plain function pipeline if it blocks gate G6 by more than ~30 minutes.
-15. **`skills_seed.json` (Q2).** ~30–50 hand-authored entries for v1. Swap to 150 real skills.sh entries is tracked in `TODO.md`.
-16. **Mock LLM judge (Q16).** Mock mode returns templated mid scores so the radar chart populates. Switch to real judge in mock-mode tracked in `TODO.md`.
-17. **`llm_cache` collection (Q12).** Skipped for MVP. Replay reads `subtask_outputs` / `coalition_messages` directly.
-18. **Repo layout (Q24/§8).** Workspace root *is* the project root; no nested `agent_market/` directory. The DB name `agent_coalitions` provides the namespace separation.
-19. **Test scope (§8 / §9.6; Q18).** The four files in §8 are authoritative.
-20. **Stretch (Q15, Q19).** §11.2 strategy comparison and §5.3 AI hero render are stretch gates G12 / G13 — not part of definition-of-done.
-
-See `docs/TODO.md` for the live backlog and gate status; the original gate-by-gate plan is preserved in git history.
-
----
-
-## Hackathon Premise (Track 2 — Multi-Agent Collaboration)
-
-> Develop a multi-agent system in which specialized agents explore, assign tasks, and communicate with one another, using MongoDB to organize and oversee contexts. How do agents convey their skills, identify suitable peers for a sub-task, share context effectively within token limits, and perform intricate tasks resulting from successful collaborations?
+> *Develop a multi-agent system in which specialized agents explore, assign tasks, and communicate with one another, using MongoDB to organize and oversee contexts. How do agents convey their skills, identify suitable peers for a sub-task, share context effectively within token limits, and perform intricate tasks resulting from successful collaborations?*
 
 This document answers each of the four questions in the prompt directly:
 
 1. **How do agents convey their skills?** A real public skills catalog (skills.sh) is ingested into MongoDB; each agent's skills are embedded with `text-embedding-3-small` and stored alongside a `prior_reputation` scalar derived from installs/stars and updated across runs (§3.1, §3.2).
+
 2. **How do they identify suitable peers for a sub-task?** Atlas `$vectorSearch` retrieves ~10 candidate skills per subtask, then a pairwise-complementarity coalition formation step (rank-1 Shapley over an induced subgraph game) picks a coalition of 1–3 agents (§4.2, §4.3).
-3. **How do they share context effectively within token limits?** Two complementary channels, both backed by MongoDB: an append-only blackboard for in-coalition messages with a single revision pass, and a strict ≤200-token `subtask_outputs.summary` that is the only thing crossing subtask boundaries (§3.6, §4.5, §9.1 constraint #8).
+
+3. **How do they share context effectively within token limits?** Two complementary channels, both backed by MongoDB: an append-only communication forum for in-coalition messages with a single revision pass, and a strict ≤200-token `subtask_outputs.summary` that is the only thing crossing subtask boundaries (§3.6, §4.5, §9.1 constraint #8).
+
 4. **How do they perform intricate tasks resulting from successful collaborations?** Subtasks execute in topological order over the DAG; a synthesizer + validator + quantity surveyor + visual designer assemble the per-subtask summaries into a government-bid-style proposal, and reputation is updated for the next run (§4.5–§4.7, §10).
 
-MongoDB is the single substrate for all five roles this requires: skills inventory, assignment ledger, blackboard message bus, cross-subtask context store, and persistent reputation memory.
+MongoDB is the single substrate for all five roles this requires: skills inventory, assignment ledger, forum message bus, cross-subtask context store, and persistent reputation memory.
 
 ---
 
 ## TL;DR
 
-A complex brief (*"design a 2 km bridge for 50 cars/h"*) needs many skills no single agent has. An orchestrator LLM decomposes it into a subtask DAG with required capabilities. For each subtask, MongoDB Atlas Vector Search narrows a real skills catalog (skills.sh) to ~10 candidates; a pairwise-complementarity score (rank-1 Shapley over an induced subgraph game) picks a coalition of 1–3 agents. The coalition collaborates on a MongoDB-backed append-only blackboard coordinated by an LLM marshal, and produces a ≤200-token summary — the only thing that crosses subtask boundaries. Downstream subtasks read upstream summaries from MongoDB the same way. A synthesizer + validator + quantity surveyor + visual designer turn it all into a government-bid-style proposal. MongoDB plays five roles: skills inventory, assignment ledger, blackboard message bus, cross-subtask context store, persistent reputation. One Python process, one Atlas cluster, one OpenAI key. Not a market in the economic sense (Appendix A); not certified engineering.
+A complex brief (*"design a 2 km bridge for 50 cars/h"*) needs many skills no single agent has. An orchestrator LLM decomposes it into a subtask DAG with required capabilities. For each subtask, MongoDB Atlas Vector Search narrows a real skills catalog (skills.sh) to ~10 candidates; a pairwise-complementarity score (rank-1 Shapley over an induced subgraph game) picks a coalition of 1–3 agents. The coalition collaborates on a MongoDB-backed append-only communication forumcoordinated by an LLM marshal, and produces a ≤200-token summary — the only thing that crosses subtask boundaries. Downstream subtasks read upstream summaries from MongoDB the same way. A synthesizer + validator + quantity surveyor + visual designer turn it all into a government-bid-style proposal. MongoDB plays five roles: skills inventory, assignment ledger, communication forum message bus, cross-subtask context store, persistent reputation. One Python process, one Atlas cluster, one OpenAI key. Not a market in the economic sense (Appendix A); not certified engineering.
 
 ---
 
@@ -72,11 +40,11 @@ We propose a **centralised, capability-search-based delegation system** that han
 
 3. **Coalition formation.** Among the shortlist, we model the value of a candidate team as a **node-weighted induced subgraph game** (Deng & Papadimitriou, 1994): solo terms from skill relevance and prior reputation, edge weights from embedding-derived complementarity. The Shapley value of this game has a closed form — each skill earns its solo value plus half the sum of its complementarity edges. We select a coalition of 1–3 by greedy marginal contribution, then map skills to actual agents (skill bundles) via greedy set-cover. The orchestrator computes a deterministic **contribution score** for each candidate; there is no LLM bidding theatre.
 
-4. **Coalition execution.** Each coalition collaborates on a per-subtask **append-only blackboard** stored as a MongoDB collection. An LLM **marshal** posts a kickoff brief, each agent posts its contribution while reading the log so far, and the marshal reconciles (with at most one revision round) into a single token-bounded summary (≤ 200 tokens). Only the summary crosses the subtask boundary. The same mechanism handles intra-coalition and inter-subtask context sharing.
+4. **Coalition execution.** Each coalition collaborates on a per-subtask **append-only communication forum** stored as a MongoDB collection. An LLM **marshal** posts a kickoff brief, each agent posts its contribution while reading the log so far, and the marshal reconciles (with at most one revision round) into a single token-bounded summary (≤ 200 tokens). Only the summary crosses the subtask boundary. The same mechanism handles intra-coalition and inter-subtask context sharing.
 
 5. **Synthesis and delivery.** A synthesizer, validator, quantity surveyor, and visual designer run in parallel on the assembled subtask outputs, and a final-report agent produces a markdown government-bid proposal containing two visualizations (Plotly engineering schematic + a hand-built stylised SVG architectural elevation), a deterministic validation card, and a costed budget. Agent reputations are updated and persisted.
 
-The result is a system that addresses every clause of the hackathon prompt — *agents convey their skills (catalog ingestion), identify suitable peers (vector search + complementarity), share context within token limits (marshal-consolidated summaries), and perform intricate tasks resulting from successful collaborations (synthesis pipeline)* — using a single Python process with no servers and no agent-to-agent network protocol. MongoDB Atlas is not a database in the sidecar sense; it plays five distinct architectural roles — skills inventory, assignment ledger, blackboard message bus, cross-subtask context store, and persistent reputation memory — and removing it removes five capabilities. The demo use case is conceptual infrastructure design; the end artefact is a government-bid-style proposal document. We deliberately do not claim to be a market in the economic sense (Appendix A) or a certified engineering tool (§ 1.4).
+The result is a system that addresses every clause of the research question — *agents convey their skills (catalog ingestion), identify suitable peers (vector search + complementarity), share context within token limits (marshal-consolidated summaries), and perform intricate tasks resulting from successful collaborations (synthesis pipeline)* — using a single Python process with no servers and no agent-to-agent network protocol. MongoDB Atlas is not a database in the sidecar sense; it plays five distinct architectural roles — skills inventory, assignment ledger, communication forum message bus, cross-subtask context store, and persistent reputation memory — and removing it removes five capabilities. The demo use case is conceptual infrastructure design; the end artefact is a government-bid-style proposal document. We deliberately do not claim to be a market in the economic sense (Appendix A) or a certified engineering tool (§ 1.4).
 
 ---
 
@@ -84,7 +52,7 @@ The result is a system that addresses every clause of the hackathon prompt — *
 
 ### 1.1 The problem
 
-The hackathon track asks: *"How do agents convey their skills, identify suitable peers for a sub-task, share context effectively within token limits, and perform intricate tasks resulting from successful collaborations?"*
+The challenge: *"How do agents convey their skills, identify suitable peers for a sub-task, share context effectively within token limits, and perform intricate tasks resulting from successful collaborations?"*
 
 Every published multi-agent demo we have seen handles this with one of three patterns:
 - **Hand-wired pipelines** — works, but no delegation actually happens.
@@ -110,7 +78,7 @@ We deliberately do **not** claim this is a market in the economic sense. There a
 |---|---|---|
 | Agent discovery | Hardcoded list | Vector search over real skills catalog |
 | Coalition selection | Brute force or hand-wiring | Pairwise complementarity (rank-1 Shapley) |
-| Inter-agent comms | RPC, queue, or implicit | Mongo append-only blackboard |
+| Inter-agent comms | RPC, queue, or implicit | Mongo append-only communication forum |
 | Context sharing | Pass full outputs | Marshal-consolidated summaries only |
 | Audit trail | Logs scattered in stdout | Single Mongo source of truth, judge-visible |
 | Reputation | None | Persistent across runs |
@@ -133,7 +101,7 @@ The disclaimer *"this is conceptual; not certified engineering"* must appear in 
 
 ### 2.1 One-paragraph mental model
 
-A user submits a prompt. An LLM **decomposer** turns it into a DAG of subtasks, each annotated with required capabilities. For every subtask, the orchestrator (a) queries `skills` via Atlas Vector Search, (b) runs pairwise-complementarity coalition selection to pick 1–3 skills, (c) maps skills to agents via greedy set-cover, (d) opens a blackboard log in Mongo, (e) lets an LLM **marshal** kick off, (f) lets each agent post a contribution, (g) lets the marshal reconcile and write a final summary. Subtasks run in topological order; downstream agents read upstream summaries from Mongo. After all subtasks finish, a **synthesizer** produces a unified design spec, three end-of-pipeline agents (validator, quantity surveyor, visual designer) run in parallel, and a **final report agent** writes a markdown government-bid proposal. Reputation is updated and persisted. The demo is run twice to prove persistence.
+A user submits a prompt. An LLM **decomposer** turns it into a DAG of subtasks, each annotated with required capabilities. For every subtask, the orchestrator (a) queries `skills` via Atlas Vector Search, (b) runs pairwise-complementarity coalition selection to pick 1–3 skills, (c) maps skills to agents via greedy set-cover, (d) opens a communication forum log in Mongo, (e) lets an LLM **marshal** kick off, (f) lets each agent post a contribution, (g) lets the marshal reconcile and write a final summary. Subtasks run in topological order; downstream agents read upstream summaries from Mongo. After all subtasks finish, a **synthesizer** produces a unified design spec, three end-of-pipeline agents (validator, quantity surveyor, visual designer) run in parallel, and a **final report agent** writes a markdown government-bid proposal. Reputation is updated and persisted. The demo is run twice to prove persistence.
 
 ### 2.2 ASCII architecture
 
@@ -154,7 +122,7 @@ A user submits a prompt. An LLM **decomposer** turns it into a DAG of subtasks, 
         │     1. vector-search skills                         │
         │     2. pairwise-complementarity coalition           │
         │     3. set-cover skills → agents                    │
-        │     4. marshal opens blackboard                     │
+        │     4. marshal opens communication forum            │
         │     5. agents post contributions                    │
         │     6. marshal reconciles + final summary           │
         │  synthesize → validate ‖ cost ‖ visualize → report  │
@@ -192,7 +160,7 @@ A user submits a prompt. An LLM **decomposer** turns it into a DAG of subtasks, 
 
 Five distinct uses, all genuine. None reduces to a Python dict without losing a real capability (persistence, concurrent-safe writes, structured + vector co-query, judge-visible provenance).
 
-If a reviewer challenges *"why Mongo and not just dicts?"* the answer is: persistence (reputation), concurrent-safe writes (blackboard), structured + vector co-query (skill search), and judge-visible provenance (Records tab). Removing Mongo means removing five capabilities, not just one.
+If a reviewer challenges *"why Mongo and not just dicts?"* the answer is: persistence (reputation), concurrent-safe writes (communication forum), structured + vector co-query (skill search), and judge-visible provenance (Records tab). Removing Mongo means removing five capabilities, not just one.
 
 ---
 
@@ -306,7 +274,7 @@ One per coalition (per subtask). The "contribution score" replaces the old "bid"
 }
 ```
 
-### 3.6 `coalition_messages` (the blackboard)
+### 3.6 `coalition_messages` (the communication forum)
 
 The mental model is **`coalitionN.log`**. Each row is one log line.
 
@@ -469,7 +437,7 @@ Given coalition skill set `K`:
 - Greedy set-cover: pick agent maximising `cover` weighted by `reputation`; remove its covered skills from `K`; repeat until `K` empty or 3 agents picked.
 - Prefer polyvalent agents on ties (the "polyvalence bonus"): `score = cover · (1 + 0.05 · polyvalence) · reputation`.
 
-### 4.5 Coalition execution (the blackboard protocol)
+### 4.5 Coalition execution (the communication forum protocol)
 
 For each subtask `T` in topological order:
 
@@ -607,7 +575,7 @@ Wide layout. Fixed top bar with app name + disclaimer banner.
 
 1. **Overview** — run metadata, key metrics, both visuals side-by-side, validation badge.
 2. **Assignments** — three subsections: Tasks table; Assignments table with contribution scores and selection rationale; live event timeline. (Per Amendments 2026-05-01 the tab is named "Assignments"; it was "Agent Market" in earlier drafts.)
-3. **Coalitions** — one collapsible card per subtask, each rendering its `coalition_messages` as a chat-style timeline (marshal in one colour, agents in another). This is the **direct visual answer** to the hackathon question about agent communication.
+3. **Coalitions** — one collapsible card per subtask, each rendering its `coalition_messages` as a chat-style timeline (marshal in one colour, agents in another). This is the **direct visual answer** to the hacka question about agent communication.
 4. **Design** — design_spec table + engineering schematic.
 5. **Validation** — validation cards, deterministic check results, warnings.
 6. **Budget** — line-item table + bar chart by category.
@@ -664,7 +632,7 @@ Mock mode is the *fallback if the OpenAI key fails during demo*. It must not be 
 │   ├── matching.py                   # vector search + scoring
 │   ├── coalitions.py                 # pairwise complementarity + greedy
 │   ├── set_cover.py                  # skills → agents
-│   ├── blackboard.py                 # post / read / render log
+│   ├── blackboard.py                 # post / read / render log (communication forum)
 │   ├── marshal.py                    # kickoff + reconcile prompts
 │   ├── execution.py                  # the per-subtask loop
 │   ├── synthesis.py                  # final design spec
@@ -713,7 +681,7 @@ The coding agent **must** follow this section verbatim. Deviations require a wri
 |---|---|---|
 | 1. Bootstrap | Conda env (`environment.yml`), project tree, `.env` + `.env.example`, Mongo connection check, indexes created | 0.5 |
 | 2. Data layer | skills_seed.json prepared (manual or scrape), seed loader, agent synthesiser | 1.0 |
-| 3. Mock pipeline | decomposer, matching, coalitions, set_cover, blackboard, mock marshal & agents, synthesis, validation, surveyor — fully working in mock mode end-to-end | 2.5 |
+| 3. Mock pipeline | decomposer, matching, coalitions, set_cover, communication forum, mock marshal & agents, synthesis, validation, surveyor — fully working in mock mode end-to-end | 2.5 |
 | 4. UI scaffold | Streamlit with all tabs reading mock-mode data | 1.5 |
 | 5. Visuals | Plotly schematic + SVG architectural elevation | 1.5 |
 | 6. Real LLMs | Wire OpenAI for decomposer, marshal, agents, synthesizer, surveyor narrative, final reporter | 1.5 |
@@ -786,11 +754,11 @@ The agent should treat this table as the single source of progress. **No gate ma
 >
 > *"I'll submit a brief: design a 2-kilometre bridge for 50 cars per hour. The system pulls real skills from the skills.sh catalog into MongoDB. An LLM decomposes the brief into seven subtasks. For each one, MongoDB Atlas Vector Search reduces hundreds of skills to a handful, and a pairwise-complementarity score — a rank-1 Shapley approximation — selects a coalition of two or three."*
 >
-> *"Each coalition collaborates on a Mongo-backed blackboard. An LLM marshal opens the discussion, agents post contributions, the marshal reconciles. The only thing that leaves the coalition is a 200-token summary — that is how we share context within token limits."*
+> *"Each coalition collaborates on a Mongo-backed communication forum. An LLM marshal opens the discussion, agents post contributions, the marshal reconciles. The only thing that leaves the coalition is a 200-token summary — that is how we share context within token limits."*
 >
 > *"At the end we get a unified design spec, deterministic validation, a cost estimate, and two visuals: an engineering schematic and a stylised architectural elevation. Everything lives in MongoDB — including the agent reputations, which update at the end of every run. Watch — I'll run it again, and you'll see the coalition selections shift because reputations changed."*
 >
-> *"MongoDB is not just our database. It's the skills inventory, the assignment ledger, the blackboard message bus, the context store, and the audit trail. Five distinct roles in one system."*
+> *"MongoDB is not just our database. It's the skills inventory, the assignment ledger, the communication forum message bus, the context store, and the audit trail. Five distinct roles in one system."*
 
 ---
 
@@ -838,7 +806,7 @@ For each subtask in a run, an external LLM judge (a separate model role, prompt-
 - *completeness against required_capabilities* (0–10)
 - *internal consistency* (0–10)
 
-The judge is given only the subtask description and the final summary — never the blackboard log, to avoid bias. Scores stored in `validation_results.judge_scores`. A small radar chart in the Validation tab visualises them.
+The judge is given only the subtask description and the final summary — never the communication forum log, to avoid bias. Scores stored in `validation_results.judge_scores`. A small radar chart in the Validation tab visualises them.
 
 ### 11.4 What we deliberately do NOT validate
 
@@ -876,7 +844,7 @@ This addresses the most common reviewer complaint about LLM demos ("I can't repr
 - **Agent** — a profile in the `agents` collection. A skill bundle. Not a process.
 - **Marshal** — a designated LLM role (one per coalition) responsible for kickoff, reconcile, and final summary. Marshals are themselves agents drawn from a small set of *coordinator-style* profiles.
 - **Coalition** — the 1–3 agents selected to deliver one subtask.
-- **Blackboard** — the `coalition_messages` collection, scoped by `(run_id, subtask_id)`. Conceptually a per-coalition append-only log.
+- **Communication forum** — the `coalition_messages` collection, scoped by `(run_id, subtask_id)`. Conceptually a per-coalition append-only log.
 - **Contribution score** — deterministic score computed by the orchestrator for each agent considered for assignment. Replaces the word "bid" everywhere.
 - **Subtask summary** — the marshal-produced ≤ 200-token text that crosses subtask boundaries. The only such text. Stored in `subtask_outputs.summary`.
 

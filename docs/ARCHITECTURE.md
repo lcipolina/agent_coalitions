@@ -2,9 +2,9 @@
 
 This document explains how Agent Coalitions is built and why. It is the long-form companion to `MVP_DESIGN.md` (the contract); the cooperative-game-theory background sits in `GAME_THEORY_PRIMER.md`.
 
-> **Looking for the elevator pitch?** See [MATCHING_PIPELINE.md](MATCHING_PIPELINE.md) for a single-page walkthrough of how a free-text requirement becomes a working agent team — vector search → coverage floor → greedy coalition → set-cover → Shapley credit — with infographics and the *"MongoDB plays five distinct roles"* cheat-sheet.
+> **Looking for a TL;DR?** See [MATCHING_PIPELINE.md](MATCHING_PIPELINE.md) for a single-page walkthrough of how a free-text requirement becomes a working agent team — vector search → coverage floor → greedy coalition → set-cover → Shapley credit — with infographics and the *"MongoDB plays five distinct roles"* cheat-sheet.
 
-The system was built for a one-day hackathon, so every choice is calibrated to the question: *what produces a credible, judgeable end-to-end demo within a single working day, while keeping every interesting design decision honest?*
+The system was built asn an MVP, so every choice is calibrated to the question: *what produces a credible, judgeable end-to-end demo within a single working day, while keeping every interesting design decision honest?*
 
 ---
 
@@ -177,7 +177,7 @@ Decision rationale:
 
 The system distinguishes **skills** from **agents**:
 
-- A **skill** is a capability vector with provenance (name, category, embedding, prior reputation, weekly install proxy from a public marketplace). The seed corpus has 36 hand-authored entries spanning structural engineering, materials, aesthetics, geometry, mathematics, and writing. Post-hackathon, this swaps for a 150-entry pull from a real skills index without any code change.
+- A **skill** is a capability vector with provenance (name, category, embedding, prior reputation, weekly install proxy from a public marketplace). The seed corpus has 36 hand-authored entries spanning structural engineering, materials, aesthetics, geometry, mathematics, and writing. Later, this swaps for a 150-entry pull from a real skills index without any code change.
 - An **agent** is a small bag of 2–4 skills. There are 21 agents in the seed (20 multi-skill plus one synthetic marshal). Every domain assignment is an agent; the marshal is the only agent the system always selects.
 
 Why this split matters: the *retrieval problem* (which capabilities does this subtask need?) is naturally posed against skills, while the *delegation problem* (who should actually do the work?) is naturally posed against agents. Coupling them at the data layer would force one structure on both, and the demo would either retrieve the wrong unit or assign the wrong unit.
