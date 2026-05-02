@@ -21,9 +21,9 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [ ] Replace hand-authored `data/skills_seed.json` (~30–50 entries) with **150 real skills.sh entries**. (Q2)
 - [ ] Replace mock LLM judge with the real LLM judge in mock-mode parity tests. The mock currently returns templated mid scores so the radar chart populates. (Q16)
 - [ ] Run §11.2 strategy comparison (A: random, B: top-by-reputation, C: our mechanism) — implement gate **G12**.
-- [x] AI hero render via OpenAI image API + "Concept render" tab — gate **G13**. *(Done on `langgraph` branch — `src/pipeline/concept_render.py`, on-demand UI tab, mock-mode SVG placeholder so the demo never blanks out. Not yet merged into `master`.)*
+- [x] AI hero render via OpenAI image API + "Concept render" tab — gate **G13**. *(Done on `feat/concept-render-and-cache` branch — `src/pipeline/concept_render.py`, on-demand UI tab, mock-mode SVG placeholder so the demo never blanks out. Not yet merged into `master`.)*
 - [ ] Tighten validator: dynamic-load factor, fatigue check stub, deflection limit.
-- [x] Cache LLM responses in Mongo `llm_cache` collection (Q12). *(Done on `langgraph` branch — opt-in via `USE_LLM_CACHE`, default on; cache hits do not bump the LLM call counter, preserving G9 replay semantics. Not yet merged into `master`.)*
+- [x] Cache LLM responses in Mongo `llm_cache` collection (Q12). *(Done on `feat/concept-render-and-cache` branch — opt-in via `USE_LLM_CACHE`, default on; cache hits do not bump the LLM call counter, preserving G9 replay semantics. Not yet merged into `master`.)*
 - [ ] Verify "mock mode" is a single global flag inherited by every LLM call site (currently planned via `src.config.settings.use_mock_llm`); add a runtime assertion that no chat call goes out when the flag is true.
 
 - [x] Implement LangGraph in another branch. *(Done — branch `langgraph`, plus `docs/LANGGRAPH.md`. Parallel orchestrator behind `USE_LANGGRAPH`; sidebar toggle, status badge, Workflow tab. Not yet merged into `master`.)*
