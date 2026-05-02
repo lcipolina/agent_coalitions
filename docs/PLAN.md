@@ -280,17 +280,18 @@ Use LangGraph for the orchestrator. **Escape hatch:** if LangGraph wiring blocks
 ```markdown
 # TODO — post-hackathon backlog
 
-## Critical (correctness / demo-blocking)
-
-- [ ] Tighten validator: include dynamic-load factor, fatigue check stub.
-      Today's checks are static; a moving-load case is the most-asked
-      question by engineering reviewers and the cheapest credibility win.
+> Nothing here is demo-blocking. The 1-day MVP (gates G1–G10) ships on
+> `master` and the LangGraph backend ships on the `langgraph` branch.
+> These are quality / coverage / polish items for after the hackathon.
 
 ## Important (quality / coverage)
 
 - [ ] Replace hand-authored `data/skills_seed.json` (~70 entries) with
       ~150 real skills.sh entries. Bigger, realer catalogue → better
       vector-search recall and a more honest demo claim.
+- [ ] Tighten validator: include dynamic-load factor, fatigue check stub.
+      Today's checks are static; a moving-load case is the most-asked
+      question by engineering reviewers and the cheapest credibility win.
 - [ ] Add **mock-vs-real LLM-judge parity tests**.
       *(Both judges already exist in production code: real LLM judge in
       `src/pipeline/validation.py`; deterministic mock judge in
