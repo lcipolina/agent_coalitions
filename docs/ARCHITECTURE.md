@@ -16,7 +16,7 @@ Internally, this is delivered by a fixed nine-stage sequential pipeline:
 
 1. **Decompose** — a single LLM call splits the brief into a 5–8-node DAG of subtasks (site, loads, materials, structural system, aesthetics, validation prep, final synthesis).
 2. **Validation-spec** — a Validator-Spec agent reads the brief and emits a small list of acceptance criteria (id / must-have / optional structured `check` block with op `lte|gte|between|present|equals_any`). The list is persisted on the `runs` row and threaded into every marshal kickoff so each coalition is briefed on what the design will be judged on. On parse failure the pipeline falls back to a single qualitative criterion.
-3. **Execute subtasks** — for each subtask, the system retrieves candidate skills via Atlas Vector Search, forms a small coalition of skills, picks ≤ 3 agents that cover those skills, runs a three-round blackboard exchange (marshal kickoff → parallel agent contributions → marshal reconcile), and writes a token-capped subtask output.
+3. **Execute subtasks** — for each subtask, the system retrieves candidate skills via Atlas Vector Search, forms a small coalition of skills, picks ≤ 3 agents that cover those skills, runs a three-round communication-forum exchange (marshal kickoff → parallel agent contributions → marshal reconcile), and writes a token-capped subtask output.
 4. **Synthesise** — one LLM call rolls every subtask output into a structured `design_specs` JSON.
 5. **Validate** — a generic dispatcher evaluates each criterion in `runs.validation_spec` against the synthesised spec (with a small set of computed virtual fields such as `span_to_depth_ratio` so the criteria can stay in natural top-level vocabulary). Criteria without a structured `check` are recorded as `qualitative` and surfaced to the LLM judge, which scores each subtask output on clarity/completeness/consistency.
 6. **Cost** — a quantity-take-off heuristic over the spec, multiplied by a fixed `cost_model.json` rate card, with a 10% finishing premium and 15% contingency, and a one-paragraph surveyor narrative.
@@ -39,7 +39,7 @@ The system is six packages, each with a single concern. The UI talks only to the
 ```mermaid
 flowchart LR
     subgraph UI["Streamlit UI (app.py)"]
-        TABS["Tabs: Plan · Coalitions · Blackboard ·\nSpec · Validation · Cost · Rendering · Report"]
+        TABS["Tabs: Plan · Coalitions · Agent comms ·\nSpec · Validation · Cost · Rendering · Report"]
     end
 
     subgraph PIPE["src/pipeline (orchestrator + 9 stages)"]
@@ -58,7 +58,7 @@ flowchart LR
     subgraph AG["src/agents (coalition mechanics)"]
         COAL["coalitions\n(rank-1 Shapley + pairwise)"]
         SC["set_cover\n(skill -> agents)"]
-        BB["blackboard"]
+        BB["comms_forum"]
         MARSH["marshal\n(round 0 / round 2)"]
     end
 
@@ -167,7 +167,7 @@ flowchart LR
 
 Decision rationale:
 
-- **Single source of truth.** The blackboard, the agent registry, the assignment ledger, the cost roll-up, the artefacts, and the audit log all live in one database. Replay correctness becomes a property of the storage layer, not the application layer.
+- **Single source of truth.** The communication forum, the agent registry, the assignment ledger, the cost roll-up, the artefacts, and the audit log all live in one database. Replay correctness becomes a property of the storage layer, not the application layer.
 - **Atlas Vector Search.** The skills index supports cosine similarity over 1536-dim embeddings with optional metadata filters. The same index serves both mock and real modes; only the embedder changes. A pure-Python cosine fallback in `src.matching` exists for the case where the index is briefly unavailable, but the demo uses `$vectorSearch`.
 - **Auditability by construction.** Every domain insert is paired with an `events` row via `insert_with_event(...)`, so the `events` collection alone reconstructs the full timeline of any run. This is what makes the replay button a one-screen demo and not a re-execution.
 
@@ -213,7 +213,7 @@ Tests in `tests/test_coalitions.py` pin down each property: highest-solo seeding
 
 ---
 
-## 5. The blackboard protocol
+## 5. The communication-forum protocol
 
 For each subtask, the marshal and the coalition exchange exactly three rounds of messages:
 
@@ -286,7 +286,7 @@ Both expose the same `run_pipeline(prompt) -> dict` shape, share the helpers in 
 
 **What LangGraph buys us.** A typed shared state (`GraphState: TypedDict`), declarative `add_node`/`add_edge` wiring, a self-rendering Mermaid diagram (visible in the *\ud83d\udd78\ufe0f Workflow* tab via `graph.get_graph().draw_mermaid()`), and a clean place to add conditional edges or parallel branches in the future.
 
-**What we deliberately do not use.** No `Checkpointer` (MongoDB already persists every artifact), no `ToolNode` (our LLM client wraps tool calls itself), no `MessagesState` (the blackboard already persists every message to `coalition_messages`), no `Send` / `Map` parallelism over subtasks in this PR (preserves the existing topological-order semantics). Replay stays on the function backend regardless of the flag, because replay must make zero LLM calls and is a strict read-only path against MongoDB.
+**What we deliberately do not use.** No `Checkpointer` (MongoDB already persists every artifact), no `ToolNode` (our LLM client wraps tool calls itself), no `MessagesState` (the communication forum already persists every message to `coalition_messages`), no `Send` / `Map` parallelism over subtasks in this PR (preserves the existing topological-order semantics). Replay stays on the function backend regardless of the flag, because replay must make zero LLM calls and is a strict read-only path against MongoDB.
 
 Full integration notes, node-to-stage mapping, and future-work boundaries: [LANGGRAPH.md](LANGGRAPH.md).
 
@@ -358,7 +358,7 @@ src/
   agents/
     coalitions.py            # rank-1 Shapley + pairwise complementarity
     set_cover.py             # weighted greedy skill→agent set cover
-    blackboard.py            # post / read coalition_messages
+    blackboard.py            # post / read coalition_messages (legacy module name; user-facing label is "communication forum" / "agent comms")
     marshal.py               # round 0 kickoff + round 2 reconcile
 
   pipeline/
