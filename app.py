@@ -54,12 +54,12 @@ def run_pipeline(prompt: str):
 from src.core.progress import set_listener  # noqa: E402
 
 st.set_page_config(
-    page_title="Agent Teams — Conceptual Design",
+    page_title="Coalition Formation over a Skill Marketplace",
     page_icon="🔮",
     layout="wide",
 )
 
-DEFAULT_PROMPT = "design a 2 km bridge for 50 cars/h with trucks, modern aesthetic"
+DEFAULT_PROMPT = "design a 2 km bridge for 50 cars/h, modern aesthetic"
 
 STAGES = [
     ("decompose", "1️⃣  Decompose"),
@@ -204,7 +204,10 @@ with st.sidebar:
 # ----------------------------------------------------------------------------
 # Header
 # ----------------------------------------------------------------------------
-st.title("🔮  Agent Teams — Conceptual Design")
+st.title("🔮  Coalition Formation over a Skill Marketplace")
+st.caption(
+    "Decomposing and executing complex tasks with multi-agent teams."
+)
 st.caption(
     "Multi-agent team formation over a MongoDB Atlas Vector Search "
     "skills index."

@@ -200,6 +200,132 @@ mode.
 
 ---
 
+## How the embeddings (and the cosine) are actually produced
+
+The vector-search layer is the most important step of the pipeline
+to get right, and it's the one most often hand-waved in agent-system
+papers, so this section spells out the full chain.
+
+### Indexing time (one-shot, when the catalog is seeded)
+
+The catalog lives in `data/skills_seed.json` (70 skills as of this
+writing). When the seed script runs, every skill is converted to a
+single short document — its `name`, `description`, and `tags` joined
+into a paragraph — and that paragraph is sent to OpenAI's embedding
+endpoint via the official **`openai` Python SDK**
+(`OpenAI().embeddings.create(model=..., input=...)`). The model is
+**`text-embedding-3-small`**, which returns a 1536-dimensional
+float vector per call. Each skill document is then written to
+MongoDB with the embedding stored alongside the rest of its fields,
+i.e. `{ skill_id, name, description, tags, prior_reputation,
+weekly_installs, embedding: [1536 floats], … }`.
+
+Once the documents are in MongoDB, an **Atlas Vector Search index**
+named `skills_embedding_vector` is created over the `skills.embedding`
+field. The index is configured with `type: "vectorSearch"`,
+`numDimensions: 1536`, `similarity: "cosine"`. Atlas builds an
+**HNSW** (Hierarchical Navigable Small World) graph on those vectors
+behind the scenes — that's the data structure that makes
+sub-millisecond approximate nearest-neighbour lookup possible at
+scale. We do not implement HNSW; Atlas does. Code references:
+[src/db/seed.py](../src/db/seed.py) for the seeding loop and
+[src/db/indexes.py](../src/db/indexes.py) for the index definition.
+
+### Query time (per subtask, in `_candidates_for`)
+
+When a run starts, the LLM decomposer produces a DAG of subtasks,
+each carrying a list of free-text **required capabilities** (e.g.
+T1 "Site & geometry" might need *"site planning"*, *"geometry"*,
+*"alignment"*). For every capability we then build a
+**prompt-anchored query string** by concatenating the run's full
+prompt with the capability — for example, `"design a 2 km bridge
+for 50 cars/h, modern aesthetic\nsite planning"`. The anchoring
+step matters: without it, a generic capability word like *"loads"*
+embeds the same way for a bridge as for a drone, and the cosine
+search returns aerospace skills with high confidence. With the
+prompt prepended, the same capability is steered toward the project
+domain. The anchored string is sent through the same
+`text-embedding-3-small` endpoint to produce the **query vector**
+$q \in \mathbb{R}^{1536}$.
+
+The query vector is then handed to MongoDB through the
+**`$vectorSearch` aggregation stage**:
+
+```python
+db.skills.aggregate([{
+    "$vectorSearch": {
+        "index": "skills_embedding_vector",
+        "path": "embedding",
+        "queryVector": q,
+        "numCandidates": 100,
+        "limit": 8,
+    }
+}])
+```
+
+Atlas walks its HNSW graph, computes cosine similarity between $q$
+and the indexed skill embeddings, and returns the top 8 skills
+sorted by similarity, with the score projected back as
+`vectorSearchScore`. **We never compute that cosine in Python.**
+That is the actual RAG-retrieval moment: *embed the query, ask
+MongoDB which catalogued embeddings are closest.*
+
+### A second, exact cosine in Python — and why
+
+There is a second cosine computation, but it is not redundant.
+Atlas's `vectorSearchScore` is a ranking-time quantity produced by
+an approximate-nearest-neighbour index; it is fine for ordering, but
+not directly comparable across queries (the same absolute value can
+mean different things depending on the local density of the HNSW
+graph at the query point). For the coalition-formation step we need
+a number that is **comparable across queries** and that we can
+reason about with a fixed threshold. So `_candidates_for()` in
+[src/pipeline/execution.py](../src/pipeline/execution.py) re-loads
+each candidate skill's full-precision embedding from MongoDB and
+computes the exact cosine in NumPy:
+
+$$
+\text{coverage}(s, q) \;=\; \frac{q \cdot e_s}{\lVert q \rVert \, \lVert e_s \rVert}
+$$
+
+That `coverage` value is what drives the **0.40 coverage floor**
+(skills below it are discarded as off-topic) and what feeds into the
+solo value of each candidate in the coalition formula
+$v(\{s\}) = 0.6\,\text{coverage} + 0.3\,\text{prior\_rep} + 0.1\,
+\log(1+\text{installs})$. In other words, Atlas does retrieval; the
+Python cosine does *admissibility and economics*.
+
+### Mock mode — a deliberate placeholder
+
+When `USE_MOCK_LLM=true`, the same code path runs but `embed()` is
+replaced by a deterministic pseudo-embedding in `src/llm/mock.py`:
+each input text is hashed with SHA-256, the digest seeds a NumPy
+Mersenne-Twister generator, and that draws a 1536-dimensional unit
+vector. The math downstream still type-checks — cosine is
+well-defined on any pair of unit vectors — but the **geometry is
+meaningless**: similar input strings do not map to similar vectors.
+Mock mode is for plumbing tests and offline demos, not for retrieval
+quality. This is precisely why the pipeline also carries a
+prompt-domain tag allow-list as a second gate: the cosine signal is
+trustworthy in real mode and noise in mock mode, so the tag filter
+is what guarantees the candidate set is in-domain regardless of
+which `embed()` is in use.
+
+### One-line summary for a pitch or a paper abstract
+
+OpenAI's `text-embedding-3-small` model embeds the skill catalog
+into 1536-dimensional vectors, which MongoDB Atlas Vector Search
+indexes with a cosine-similarity HNSW graph. At query time we
+prompt-anchor each subtask capability, embed it through the same
+model, and ask Atlas to return the nearest skills. We then re-score
+the candidates with an exact NumPy cosine so the same number can
+gate admission (the 0.40 coverage floor) and feed the coalition
+value function — turning vector retrieval into the relevance signal
+of a combinatorial team-formation problem rather than just the
+retrieve-then-generate of standard RAG.
+
+---
+
 ## Is this RAG?
 
 Short answer: **step 3 alone is RAG-shaped. The whole pipeline is
