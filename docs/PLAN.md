@@ -280,18 +280,34 @@ Use LangGraph for the orchestrator. **Escape hatch:** if LangGraph wiring blocks
 ```markdown
 # TODO — post-hackathon backlog
 
-- [ ] Replace hand-authored data/skills_seed.json (~30–50 entries) with 150 real skills.sh entries.
-- [ ] Replace mock LLM judge with real LLM judge in mock-mode parity tests.
+## Critical (correctness / demo-blocking)
+
+- [ ] Tighten validator: include dynamic-load factor, fatigue check stub.
+      Today's checks are static; a moving-load case is the most-asked
+      question by engineering reviewers and the cheapest credibility win.
+
+## Important (quality / coverage)
+
+- [ ] Replace hand-authored `data/skills_seed.json` (~70 entries) with
+      ~150 real skills.sh entries. Bigger, realer catalogue → better
+      vector-search recall and a more honest demo claim.
+- [ ] Add **mock-vs-real LLM-judge parity tests**.
       *(Both judges already exist in production code: real LLM judge in
       `src/pipeline/validation.py`; deterministic mock judge in
-      `src/llm/mock.py::_judge`. What is still missing is **automated
-      parity tests** that exercise both and assert their outputs share
-      the same shape and score range. Test-coverage gap, not a runtime
-      gap.)*
-- [ ] Run §11.2 strategy comparison (A/B/C) — implement gate G12.
-- [ ] AI hero render (gate G13).
-- [ ] Tighten validator: include dynamic-load factor, fatigue check stub.
-- [ ] Cache LLM responses in Mongo `llm_cache` collection (currently skipped).
+      `src/llm/mock.py::_judge`. What is missing is automated tests
+      that exercise both and assert their outputs share the same shape
+      and score range. Test-coverage gap, not a runtime gap.)*
+- [ ] Run §11.2 strategy comparison (A: random, B: top-by-reputation,
+      C: our mechanism) — implement gate G12. The whole point of the
+      mechanism is that it should beat the baselines; we have no
+      numbers proving that yet.
+
+## Nice to have (polish / future)
+
+- [ ] AI hero render (gate G13) — OpenAI image API for non-bridge
+      designs (rollercoaster, plane, tower).
+- [ ] Cache LLM responses in a Mongo `llm_cache` collection (currently
+      skipped). Cuts real-mode demo cost and latency.
 ```
 
 ---
