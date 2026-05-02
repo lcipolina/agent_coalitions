@@ -24,6 +24,114 @@ from src.core.progress import emit
 from src.core.tokens import truncate_to_tokens
 
 
+# ---------------------------------------------------------------------------
+# Prompt-domain filter
+# ---------------------------------------------------------------------------
+# Vector search alone cannot reliably keep an aerospace propulsion skill
+# out of a bridge subtask: generic engineering vocabulary ("loads",
+# "dynamics", "materials") creates near-uniform cosine similarity across
+# domains, and in mock mode the embeddings are SHA-256 hashes — random.
+# So we add an explicit, tag-driven domain *allow-list* on top of the
+# coverage floor. A skill is kept only if its tags intersect the
+# in-domain set OR its skill_id is in a small set of domain-agnostic
+# helpers (technical writing, project management, etc.).
+
+_DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "bridge":     ("bridge", "viaduct", "overpass", "footbridge", "span"),
+    "building":   ("building", "tower", "skyscraper", "office", "residential"),
+    "aircraft":   ("aircraft", "airplane", "drone", "uav", "satellite"),
+    "rover":      ("rover", "robot", "agv", "amr", "autonomous vehicle"),
+    "vehicle":    ("car ", "truck ", " ev ", "electric vehicle", "chassis"),
+    "ship":       ("ship", "vessel", "boat", "marine", "hull"),
+}
+
+_IN_DOMAIN_TAGS: dict[str, frozenset[str]] = {
+    "bridge": frozenset({
+        "civil", "bridge", "structural", "concrete", "rebar", "steel",
+        "geotechnical", "loads", "seismic", "wind", "fatigue", "aeroelastic",
+        "eurocode", "aashto", "hl-93", "deck", "pier", "abutment",
+        "cable-stayed", "suspension", "truss", "arch",
+        "elevation", "rendering", "aesthetic", "lighting", "color", "palette",
+        "pedestrian", "cyclist",
+        "cost", "qto", "lifecycle", "carbon", "environmental",
+        "traffic", "hydrology", "river", "site", "geometry", "alignment",
+        "constructability", "fea", "validation", "materials",
+    }),
+}
+
+# Skill IDs that are domain-agnostic enough to allow under any domain
+# (writing, applied math, generic management). Keeps technical-writing
+# from being filtered out of a bridge brief.
+_DOMAIN_AGNOSTIC_SKILL_IDS: frozenset[str] = frozenset({
+    "technical-writing", "executive-summary-drafting", "risk-register-authoring",
+    "applied-mathematics", "project-management",
+    "regulatory-compliance", "safety-and-reliability", "systems-engineering",
+    "sustainability", "human-factors",
+})
+
+
+def _detect_domain(prompt: str) -> str | None:
+    p = (prompt or "").lower()
+    for domain, kws in _DOMAIN_KEYWORDS.items():
+        if any(kw in p for kw in kws):
+            return domain
+    return None
+
+
+def _is_in_domain(
+    skill_id: str, tags: list[str] | None, domain: str | None,
+) -> bool:
+    """Return True if a skill is acceptable for the detected domain.
+
+    Unknown domain -> always accept (no filter).
+    Known domain   -> accept iff skill_id is domain-agnostic OR tags
+                      intersect the in-domain tag set.
+    """
+    if not domain:
+        return True
+    if skill_id in _DOMAIN_AGNOSTIC_SKILL_IDS:
+        return True
+    in_tags = _IN_DOMAIN_TAGS.get(domain)
+    if not in_tags:
+        return True  # domain registered but no tag list yet; permissive.
+    if not tags:
+        return False
+    return any(t in in_tags for t in tags)
+
+
+def _in_domain_fallback_candidates(
+    domain: str, qvec: np.ndarray, limit: int = 8,
+) -> list[dict]:
+    """Catalog scan returning skills tagged as in-domain.
+
+    Used when vector search + the domain filter wipe out the candidate
+    set entirely (mock mode with random embeddings, or a pathological
+    capability string). Cosine is computed against the supplied query
+    vector to give the coverage score a meaningful number.
+    """
+    db = get_db()
+    in_tags = _IN_DOMAIN_TAGS.get(domain)
+    if not in_tags:
+        return []
+    rows = list(db.skills.find(
+        {"tags": {"$in": list(in_tags)}},
+        {"_id": 0, "skill_id": 1, "name": 1, "weekly_installs": 1,
+         "prior_reputation": 1, "embedding": 1, "tags": 1},
+    ))
+    if not rows:
+        return []
+    qn = qvec / max(float(np.linalg.norm(qvec)), 1e-12)
+    for r in rows:
+        e = np.asarray(r["embedding"], dtype=np.float32)
+        en = e / max(float(np.linalg.norm(e)), 1e-12)
+        r["_cov"] = float(np.clip(np.dot(qn, en), 0.0, 1.0))
+    rows.sort(
+        key=lambda r: (r.get("prior_reputation", 0.5), r["_cov"]),
+        reverse=True,
+    )
+    return rows[:limit]
+
+
 def _candidates_for(subtask: dict) -> list[CandidateSkill]:
     db = get_db()
     seen: dict[str, CandidateSkill] = {}
@@ -37,6 +145,7 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
         {"run_id": subtask["run_id"]}, {"_id": 0, "prompt": 1},
     ) or {}
     prompt_anchor = (run_doc.get("prompt") or "").strip()
+    domain = _detect_domain(prompt_anchor)
     # Embed once per (anchored) capability.
     qvec_cache: dict[str, np.ndarray] = {}
     for cap in subtask.get("required_capabilities", []):
@@ -53,9 +162,15 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
             full = db.skills.find_one(
                 {"skill_id": h["skill_id"]},
                 {"_id": 0, "skill_id": 1, "name": 1, "weekly_installs": 1,
-                 "prior_reputation": 1, "embedding": 1},
+                 "prior_reputation": 1, "embedding": 1, "tags": 1},
             )
             if not full:
+                continue
+            # Drop skills whose tags don't intersect the in-domain set
+            # for the detected project domain. This is the second gate
+            # after the coverage floor below; together they keep e.g.
+            # propulsion or PCB-design skills out of a bridge brief.
+            if not _is_in_domain(full["skill_id"], full.get("tags"), domain):
                 continue
             e = np.asarray(full["embedding"], dtype=np.float32)
             cov = float(np.clip(
@@ -75,6 +190,30 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
         kind="skill_search",
         payload={"subtask_id": subtask["subtask_id"], "n_candidates": len(seen)},
     )
+    # In-domain fallback: vector search + the off-domain filter can wipe
+    # out the candidate set when (a) the prompt is highly specific and
+    # the LLM-decomposed capability is generic, or (b) the run is in
+    # mock mode where embeddings are SHA-256 hashes (effectively random).
+    # In either case, pull a small in-domain candidate set straight from
+    # the catalog so the pipeline produces sensible team picks instead
+    # of crashing or selecting whatever weak match happens to survive.
+    if domain and len(seen) < 3:
+        any_qvec = next(iter(qvec_cache.values()), None)
+        if any_qvec is None:
+            any_qvec = np.asarray(embed(prompt_anchor or domain), dtype=np.float32)
+        for full in _in_domain_fallback_candidates(domain, any_qvec, limit=8):
+            sid = full["skill_id"]
+            if sid in seen:
+                continue
+            e = np.asarray(full["embedding"], dtype=np.float32)
+            seen[sid] = CandidateSkill(
+                skill_id=sid,
+                name=full["name"],
+                coverage=float(full.get("_cov", 0.5)),
+                prior_reputation=full.get("prior_reputation", 0.5),
+                weekly_installs=full.get("weekly_installs", 0),
+                embedding=e,
+            )
     # Coverage floor: drop any candidate whose semantic similarity to the
     # *prompt-anchored* capability query is below 0.40. The anchor
     # concatenates the run prompt to each capability before embedding, so
@@ -84,8 +223,8 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
     COVERAGE_FLOOR = 0.40
     filtered = [c for c in seen.values() if c.coverage >= COVERAGE_FLOOR]
     # If the floor wipes out the candidate set entirely (very off-domain
-    # subtask), fall back to the top-k by coverage so the pipeline still
-    # makes progress instead of crashing.
+    # subtask, or mock mode random embeddings), fall back to the top-k by
+    # coverage so the pipeline still makes progress instead of crashing.
     if not filtered:
         filtered = sorted(seen.values(), key=lambda c: c.coverage, reverse=True)[:5]
     return filtered[:15]

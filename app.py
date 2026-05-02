@@ -604,13 +604,6 @@ with tab_coal:
 
 # ----- Agent comms ----------------------------------------------------------
 with tab_bb:
-    st.caption(
-        "Real LLM responses (one OpenAI call per agent per round) when "
-        "**Mock LLM** is OFF. In mock mode the messages come from a "
-        "deterministic role-keyed router in `src/llm/mock.py` so the demo "
-        "runs offline in seconds. Either way the messages persist to "
-        "MongoDB `coalition_messages` and are replayed from there."
-    )
     msgs = list(
         db.coalition_messages.find({"run_id": run_id}, {"_id": 0})
         .sort([("subtask_id", 1), ("round", 1), ("ts", 1)])
@@ -1064,7 +1057,7 @@ digraph MongoDB {
     st.graphviz_chart(_mongo_dot, use_container_width=True)
 
     st.markdown("---")
-    st.markdown("#### The \"MongoDB does five things\" cheat-sheet")
+    st.markdown("#### The 5 spots, in detail")
     st.table(
         {
             "Role": [
@@ -1100,10 +1093,7 @@ digraph MongoDB {
 
     st.markdown("---")
     st.info(
-        "**The point:** removing MongoDB removes **five capabilities**, not one. "
-        "It's not a passive store — it's the catalog, the vector index, the "
-        "message bus, the audit log, and the cross-run memory. Every other piece "
-        "of the system (LangGraph, OpenAI, Streamlit) is replaceable; the data "
-        "fabric is what makes the whole thing work as one coherent system.",
+        "MongoDB provides *five* capabilities. It's the catalog, the vector "
+        "index, the message bus, the audit log, and the cross-run memory.",
         icon="🍃",
     )

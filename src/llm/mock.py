@@ -108,7 +108,7 @@ def _marshal_kickoff(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
                 + "\n".join(lines[:5])
             )
     return (
-        f"[mock-marshal {subtask_id}] Coalition, please post your contribution "
+        f"[marshal {subtask_id}] Team, please post your contribution "
         f"focusing on the subtask requirements. Cite upstream summaries where relevant."
         f"{criteria_block}"
     )
@@ -145,14 +145,14 @@ _MARSHAL_RECONCILE_BY_PREFIX: dict[str, str] = {
 def _marshal_reconcile(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
     return _MARSHAL_RECONCILE_BY_PREFIX.get(
         subtask_id,
-        f"[mock-marshal {subtask_id}] Reconciled summary: contributions merged; "
+        f"[marshal {subtask_id}] Reconciled summary: contributions merged; "
         f"consensus recorded as the subtask output.",
     )
 
 
 def _agent(prompt: str, agent_id: str = "agent_xxx", subtask_id: str = "T?", **_: Any) -> str:
     return (
-        f"[mock-{agent_id} {subtask_id}] Contribution: applies my skills to the subtask; "
+        f"[{agent_id} {subtask_id}] Contribution: applies my skills to the subtask; "
         f"recommend conservative defaults and flag a single open question for the marshal."
     )
 
