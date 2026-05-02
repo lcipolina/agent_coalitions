@@ -889,27 +889,41 @@ with tab_workflow:
 
     try:
         _g = _build_lg_graph()
-        _mermaid_src = _g.get_graph().draw_mermaid()
+        _graph_obj = _g.get_graph()
+        _mermaid_src = _graph_obj.draw_mermaid()
     except Exception as exc:  # pragma: no cover — surfacing the error helps
         st.error(f"Could not build LangGraph diagram: {exc}")
         _mermaid_src = ""
+        _graph_obj = None
+
+    # Primary render: convert nodes/edges to a Graphviz DOT and use the
+    # built-in st.graphviz_chart. This avoids a CDN round-trip for mermaid.js
+    # which can hang on restrictive networks (e.g. hackathon Wi-Fi).
+    if _graph_obj is not None:
+        try:
+            _node_ids = [n for n in _graph_obj.nodes]
+            _edges = [(e.source, e.target) for e in _graph_obj.edges]
+            _dot_lines = [
+                "digraph G {",
+                "  rankdir=TB;",
+                "  bgcolor=\"white\";",
+                "  node [shape=box style=\"rounded,filled\" "
+                "fillcolor=\"#eef3ff\" color=\"#4a6fa5\" "
+                "fontname=\"Helvetica\"];",
+                "  edge [color=\"#4a6fa5\"];",
+            ]
+            for n in _node_ids:
+                label = str(n).replace('"', '\\"')
+                _dot_lines.append(f'  "{n}" [label="{label}"];')
+            for src, tgt in _edges:
+                _dot_lines.append(f'  "{src}" -> "{tgt}";')
+            _dot_lines.append("}")
+            st.graphviz_chart("\n".join(_dot_lines), use_container_width=True)
+        except Exception as exc:  # pragma: no cover
+            st.warning(f"Graphviz render failed ({exc}); falling back to Mermaid source.")
 
     if _mermaid_src:
-        # Render via mermaid.js loaded from CDN inside an HTML component.
-        # Avoids extra Python deps and works without the mermaid.ink PNG
-        # service (which would require network egress at render time).
-        import streamlit.components.v1 as components
-
-        _html = f"""
-        <div class=\"mermaid\" style=\"background:#fff;padding:16px;border-radius:8px;\">
-{_mermaid_src}
-        </div>
-        <script src=\"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js\"></script>
-        <script>mermaid.initialize({{ startOnLoad: true, theme: 'default' }});</script>
-        """
-        components.html(_html, height=720, scrolling=True)
-
-        with st.expander("Mermaid source"):
+        with st.expander("Mermaid source (raw)"):
             st.code(_mermaid_src, language="mermaid")
 
     st.markdown("---")
