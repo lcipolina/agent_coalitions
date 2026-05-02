@@ -376,11 +376,11 @@ if metrics:
     c4.metric("Cost (EUR)", f"{cost:,.0f}" if isinstance(cost, (int, float)) else "—")
 
 (
-    tab_dag, tab_coal, tab_bb, tab_val, tab_cost, tab_render, tab_concept,
+    tab_dag, tab_coal, tab_bb, tab_val, tab_cost, tab_render,
     tab_report, tab_reput, tab_workflow,
 ) = st.tabs([
     "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Agent comms", "\u2705 Validation",
-    "\U0001f4b6 Cost", "\U0001f3a8 Rendering", "\U0001f5bc\ufe0f Concept render",
+    "\U0001f4b6 Cost", "\U0001f3a8 Rendering",
     "\U0001f4c4 Report", "\U0001f4c8 Reputation",
     "\U0001f578\ufe0f Workflow",
 ])
@@ -804,58 +804,6 @@ with tab_render:
             st.json(spec or {}, expanded=False)
         with st.expander("Raw geometry primitives (JSON)"):
             st.json(geometry, expanded=False)
-
-
-# ----- Concept render (AI hero image) --------------------------------------
-with tab_concept:
-    from src.pipeline import concept_render as _concept_render
-
-    spec = db.design_specs.find_one({"run_id": run_id}, {"_id": 0}) or {}
-    run_doc = db.runs.find_one({"run_id": run_id}, {"_id": 0}) or {}
-    existing = db.artifacts.find_one(
-        {"run_id": run_id, "kind": _concept_render.ARTIFACT_KIND}, {"_id": 0},
-    )
-    st.caption(
-        "Optional AI-generated hero render of the synthesised design. "
-        "Calls OpenAI's image API in real-LLM mode (~5\u201310 cents, 10\u201320 s); "
-        "in mock mode a deterministic SVG placeholder is shown so the demo "
-        "still has a picture. Cached per run \u2014 click again to reuse."
-    )
-    if existing:
-        payload = existing.get("uri_or_inline") or {}
-        data_url = payload.get("data_url")
-        if data_url:
-            st.image(data_url, use_container_width=True)
-        if payload.get("placeholder"):
-            st.warning(
-                f"Placeholder shown ({payload.get('reason', 'unknown')}). "
-                "Set `USE_MOCK_LLM=false` and rerun to call the real image API."
-            )
-        with st.expander("Image prompt sent to the model"):
-            st.code(existing.get("image_prompt", ""), language="text")
-        if st.button(
-            "Regenerate concept render",
-            key="regen_concept",
-            help="Deletes the cached artifact and asks the image model again.",
-        ):
-            db.artifacts.delete_many(
-                {"run_id": run_id, "kind": _concept_render.ARTIFACT_KIND}
-            )
-            with st.spinner("Generating concept render\u2026"):
-                _concept_render.generate(run_id, run_doc.get("prompt", ""), spec)
-            st.rerun()
-    else:
-        if st.button(
-            "Generate concept render",
-            key="gen_concept",
-            type="primary",
-            disabled=not spec,
-            help=("Synthesise a hero image from the design spec." if spec
-                  else "Run the pipeline first \u2014 no design spec yet."),
-        ):
-            with st.spinner("Generating concept render\u2026"):
-                _concept_render.generate(run_id, run_doc.get("prompt", ""), spec)
-            st.rerun()
 
 
 # ----- Report ---------------------------------------------------------------

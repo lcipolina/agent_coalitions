@@ -1,1 +1,4 @@
+
+conda run -n coalitions streamlit run app.py
+
 conda run -n coalitions streamlit run app.py
