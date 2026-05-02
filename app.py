@@ -1032,7 +1032,7 @@ digraph MongoDB {
            fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
   m_cat   [label="② Catalog\\nskills, agents",
            fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
-  m_bus   [label="③ Message bus\\ncoalition_messages",
+  m_bus   [label="③ Team message bus\\n(coalition_messages)",
            fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
   m_ledg  [label="④ Assignment ledger\\nruns, subtasks, assignments,\\ndesign_specs, validation_results,\\ncost_estimates, artifacts, events",
            fillcolor="#d6f0d6" color="#2f7a2f" shape="cylinder"];
