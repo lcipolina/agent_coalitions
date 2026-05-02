@@ -12,14 +12,14 @@
 
 ## Amendments 2026-05-01
 
-Lead-confirmed amendments resolving every ambiguity flagged in `PLAN.md §3`. Where this block conflicts with the body of the document, **this block wins**.
+Lead-confirmed amendments resolving every ambiguity flagged during planning (the planning doc has since been retired — see git history). Where this block conflicts with the body of the document, **this block wins**.
 
 1. **Naming (Q21).** The word "market" is banned in current usage. DB name `agent_market` → **`agent_coalitions`**. Conda env `agent-market` → **`coalitions`**. Project / app title "Agent Market" → **"Agent Coalitions"**. Streamlit tab #2 "Agent Market" → **"Assignments"** (tab #3 "Coalitions" unchanged). Run button "Run Agent Market" → **"Run Coalitions"**. §10 narration drops the "agent market for short" phrasing. Appendix A retained as historical discussion.
 2. **Summary token cap (Q1).** Standardised on **≤ 200 tokens** for `subtask_outputs.summary` everywhere. Truncation via `tiktoken`.
 3. **Algorithm definitions filled in (§4.2; Q3, Q4, Q5).** `coverage(s, q) = clip(cosine(emb(s), emb(q)), 0, 1)`. `prior_reputation(s)` = min-max normalisation across the catalog of `0.5·log(1+installs) + 0.5·log(1+stars)`. The γ term reads `log(1+installs(s)) / log(1+max_installs_in_catalog)`, ∈ [0,1].
 4. **Default 7-subtask DAG (§4.1; Q6).** Used as decomposer fallback and by mock decomposer: T1 Site & geometry; T2 Load profile; T3 Material selection (deps T1,T2); T4 Structural system (deps T1,T2,T3); T5 Aesthetic & elevation guidance (deps T1,T4); T6 Validation prep (deps T3,T4); T7 Final synthesis brief (deps all).
 5. **Marshal (§13; Q7).** Single shared synthetic marshal `agent_id = "agent_synthetic_marshal"` for v1.
-6. **Validator checks (§4.6 / §3.9; Q8).** Minimum five: `span_to_depth_ratio`, `support_count_consistency`, `live_load_arithmetic`, `material_span_plausibility`, `lane_geometry`. Specific thresholds in `PLAN.md §3.6`.
+6. **Validator checks (§4.6 / §3.9; Q8).** Minimum five: `span_to_depth_ratio`, `support_count_consistency`, `live_load_arithmetic`, `material_span_plausibility`, `lane_geometry`. Specific thresholds in `src/pipeline/validation.py`.
 7. **Cost model (Q9).** Hand-picked unit prices in `cost_model.json`. Currency tag `EUR` retained per spec; values reasonable US-style (steel $3,500/t, weathering steel $4,000/t, concrete $180/m³, deck slab $350/m², piers $150,000 each, abutments $220,000 each, finishing premium 10%, contingency 15%).
 8. **Schema additions (Q10, Q11, Q24).** `validation_results` gains `judge_scores: [{subtask_id, clarity, completeness, consistency, rationale}]`. `runs` gains `config: {seed, git_sha, use_mock_llm}` (top-level `runs.use_mock_llm` collapsed into config). `runs.summary_metrics.estimated_cost_eur` is a denormalised copy of `cost_estimates.total`.
 9. **Blackboard simplification (§4.5; Q23).** Coalition agents post in **parallel** in round 1, seeing only the marshal kickoff and upstream `subtask_outputs.summary`. Agents do not see each other's contributions in round 1. Marshal then reconciles in round 2; one optional revision round (round 3) follows if conflict flagged.
@@ -35,7 +35,7 @@ Lead-confirmed amendments resolving every ambiguity flagged in `PLAN.md §3`. Wh
 19. **Test scope (§8 / §9.6; Q18).** The four files in §8 are authoritative.
 20. **Stretch (Q15, Q19).** §11.2 strategy comparison and §5.3 AI hero render are stretch gates G12 / G13 — not part of definition-of-done.
 
-See `PLAN.md` for the executable plan.
+See `docs/TODO.md` for the live backlog and gate status; the original gate-by-gate plan is preserved in git history.
 
 ---
 

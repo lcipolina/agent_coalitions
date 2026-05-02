@@ -1,6 +1,6 @@
 # TODO — post-hackathon backlog
 
-Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amendments 2026-05-01 and `PLAN.md §3` for the resolutions that produced these.
+Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amendments 2026-05-01 for the resolutions that produced these.
 
 ## Hackathon gate status (live)
 
@@ -27,3 +27,14 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [ ] Verify "mock mode" is a single global flag inherited by every LLM call site (currently planned via `src.config.settings.use_mock_llm`); add a runtime assertion that no chat call goes out when the flag is true.
 
 - [x] Implement LangGraph in another branch. *(Done — branch `langgraph`, plus `docs/LANGGRAPH.md`. Parallel orchestrator behind `USE_LANGGRAPH`; sidebar toggle, status badge, Workflow tab. Not yet merged into `master`.)*
+
+## Out of scope (won't do)
+
+These are deliberate non-goals — listed so the next person doesn't reopen the discussion.
+
+- Distributed agent runtimes / MCP / A2A protocols — single Python process is the point.
+- FEA, CAD, real engineering certification, AR/VR — the disclaimer covers it ("conceptual design … not certified engineering").
+- Exact Shapley computation — the closed-form rank-1 / induced-subgraph value is the right tool here (see `docs/GAME_THEORY_PRIMER.md`).
+- Authentication, rate limiting, deployment scripts, multi-tenancy.
+- Tests beyond the four files in `MVP_DESIGN.md §8`.
+- Bidding LLM calls or strategic agent behaviour — `MVP_DESIGN.md` Appendix A explains why this is *not* a market.

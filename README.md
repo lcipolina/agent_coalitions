@@ -10,7 +10,7 @@ A single Python process that takes a user brief (e.g., *"design a 2 km bridge fo
 
 **MongoDB Atlas is live.** All thirteen domain collections and the Atlas Vector Search index are real and exercised on every run. The only thing that can be mocked is the LLM layer (chat + embeddings); when mocked, Atlas Vector Search still runs end-to-end — only the query vector changes from an OpenAI embedding to a deterministic SHA-256-seeded pseudo-embedding. Mock mode is the default for the live demo because it finishes a full pipeline run in under five seconds and never depends on network weather.
 
-For the system design, the rationale behind every interesting choice (skill–agent split, coalition value formula, blackboard protocol, validation ordering, reputation weighting), and the full repository layout, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The product contract is in [docs/MVP_DESIGN.md](docs/MVP_DESIGN.md), the executable plan in [docs/PLAN.md](docs/PLAN.md), the cooperative-game-theory background in [docs/GAME_THEORY_PRIMER.md](docs/GAME_THEORY_PRIMER.md), and the post-hackathon backlog in [docs/TODO.md](docs/TODO.md).
+For the system design, the rationale behind every interesting choice (skill–agent split, coalition value formula, blackboard protocol, validation ordering, reputation weighting), and the full repository layout, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The product contract is in [docs/MVP_DESIGN.md](docs/MVP_DESIGN.md), the cooperative-game-theory background in [docs/GAME_THEORY_PRIMER.md](docs/GAME_THEORY_PRIMER.md), the 5-minute pitch script in [docs/PITCH.md](docs/PITCH.md), and the post-hackathon backlog in [docs/TODO.md](docs/TODO.md).
 
 ---
 

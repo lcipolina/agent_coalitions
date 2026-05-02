@@ -257,3 +257,17 @@ is ≤ 30 seconds. None of them require improvising.
 - [docs/TEAMS_TAB.md](TEAMS_TAB.md) — what each UI column means
 - [docs/ARCHITECTURE.md](ARCHITECTURE.md) — the broader system view
 - [docs/LANGGRAPH.md §7](LANGGRAPH.md) — the honest LangGraph self-assessment
+
+
+---
+# Executive Summary
+
+- The problem — picking a good team is harder than picking a relevant team. Two material scientists are one expert with a spare.
+
+- The architecture — 9-stage pipeline, MongoDB load-bearing in five places, replay with zero LLM calls.
+
+- The interesting bit — Shapley closed form on an induced-subgraph game (Deng–Papadimitriou 1994). Complementarity, not relevance.
+
+- MongoDB's five roles — vector search, catalog, message bus, context store, persistent reputation. "Remove Mongo, lose five capabilities."
+
+- Live demo — 5-second mock-mode end-to-end run, then the replay button and the concept render tab.

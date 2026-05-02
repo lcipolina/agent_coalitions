@@ -94,7 +94,6 @@ docs/                           # see §3.2
 - [docs/GAME_THEORY_PRIMER.md](docs/GAME_THEORY_PRIMER.md) — Shapley, induced-subgraph game, glossary, "where each number is used in the UI" mapping table.
 - [docs/TEAMS_TAB.md](docs/TEAMS_TAB.md) — line-by-line spec of the Teams tab and the contributions table.
 - [docs/MVP_DESIGN.md](docs/MVP_DESIGN.md) — original design + amendments log.
-- [docs/PLAN.md](docs/PLAN.md) — gate-by-gate plan.
 - [docs/SKILL_SEEDING.md](docs/SKILL_SEEDING.md) — how the 70-skill / 20-agent seed is built.
 - [docs/TODO.md](docs/TODO.md) — the backlog (also reproduced in §6 of this doc).
 
@@ -414,4 +413,3 @@ def build_graph():
 - Do not wire LLM calls into LangGraph's tool-calling abstractions. Our LLM client (`src/llm/openai_client.py`) is already a clean seam with mock-mode fallback. LangGraph is the *workflow engine*, not the LLM router.
 - Do not add LangChain `Runnable` chains around the nodes "for consistency". They add a 100ms-per-step overhead and obscure the call graph.
 - Do not touch [src/agents/coalitions.py](src/agents/coalitions.py) (the maths) or [src/pipeline/execution.py](src/pipeline/execution.py) (the matching loop) at all. They are orthogonal to orchestration.
-
