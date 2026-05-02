@@ -2,7 +2,9 @@
 
 **Date:** May 2, 2026
 **Repo:** `/Users/lucia/Desktop/Hackathon_MongoDB`
-**Branch:** `master` (clean apart from `docs/TODO.md` housekeeping). Last commit: `056f123 better figures`.
+**Branches:**
+- `master` — function-pipeline orchestrator. Working demo. Last commit: `4016e12 docs: add HANDOVER, drop truthful-reporting/market-defensibility line, doc updates`.
+- `langgraph` — parallel LangGraph orchestrator behind the `USE_LANGGRAPH` flag (default OFF). Switchable at runtime from the Streamlit sidebar. Both backends produce byte-identical MongoDB rows. See [docs/LANGGRAPH.md](LANGGRAPH.md). Last commit: `208111d feat(langgraph): visible UI integration`.
 **Hackathon:** [MongoDB London — Multi-Agent Collaboration track](https://cerebralvalley.ai/e/mongo-db-london-hackathon/details).
 
 This document is for the **next coding agent** picking up the project. It is deliberately concrete. Read it top to bottom before changing anything.
@@ -183,13 +185,13 @@ These are deliberately deferred from the 1-day MVP. Live status in [docs/TODO.md
 ### 6.2 Backlog (post-hackathon)
 
 - [ ] Replace hand-authored `data/skills_seed.json` (~70 entries) with **150 real skills.sh entries**. (See brief Q2.)
-- [ ] Replace mock LLM judge with the real LLM judge in mock-mode parity tests. The mock currently returns templated mid scores so the radar chart populates.
+- [ ] **Add parity tests for the LLM judge.** *Both* judges already exist in production: the mock judge in [src/llm/mock.py](../src/llm/mock.py) (`_judge`) and the real LLM judge in [src/pipeline/validation.py](../src/pipeline/validation.py) (calls `chat(role="judge")`). What is missing is *automated parity tests* that exercise both and assert their output shape and score ranges agree. This is purely test-coverage work; the runtime path is fine.
 - [ ] §11.2 strategy comparison (A: random, B: top-by-reputation, C: our mechanism) — would need gate **G12**.
 - [ ] AI hero render via OpenAI image API + "Concept render" tab — would need gate **G13**. The user mentioned this is interesting for non-bridge designs (rollercoaster, plane).
 - [ ] Tighten validator: dynamic-load factor, fatigue check stub, deflection limit.
 - [ ] Cache LLM responses in a Mongo `llm_cache` collection (currently skipped).
 - [ ] Runtime assertion that no `chat()` call goes out when `settings.use_mock_llm=True`.
-- [ ] **Implement LangGraph in another branch.** The brief asks for LangGraph. We currently use a hand-rolled orchestrator in [src/pipeline/orchestrator.py](src/pipeline/orchestrator.py) because LangGraph's state-graph API was overhead we couldn't justify in 1 day. The user explicitly wants this ported as a follow-up branch. **See §12 of this doc for a concrete migration plan.**
+- [x] **Implement LangGraph in another branch.** Done on branch `langgraph` (commits `3ab7ff8` + `208111d`). Parallel implementation in [src/pipeline/orchestrator_lg.py](../src/pipeline/orchestrator_lg.py) behind a runtime flag; sidebar toggle, status badge, and a *🕸️ Workflow* tab that renders the compiled graph as a Mermaid diagram. 14/14 tests pass against both backends. See [docs/LANGGRAPH.md](LANGGRAPH.md). The migration plan in §12 below is preserved as a record of how the port was scoped.
 - [ ] Hard-FAIL validation category (currently warnings only).
 - [ ] Investigate identical-skills duplication across teams (by design today; flag if it confuses judges).
 

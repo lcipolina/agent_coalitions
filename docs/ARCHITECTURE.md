@@ -271,11 +271,24 @@ The Jinja2 templates under `src/prompts/` are **always rendered**, even in mock 
 
 ---
 
-## 9. Why a plain function pipeline (not LangGraph)
+## 9. Orchestration backend: function pipeline and LangGraph (parallel)
 
-A LangGraph state machine was scoped in but not built. The pipeline is sequential and fixed in topology — there is no branching, no loops, no human-in-the-loop interrupts, no streamed tool calls. A plain function pipeline expresses that exactly, can be type-checked, and is trivially replayable.
+The pipeline ships with **two interchangeable orchestrators**, selected at runtime via the `USE_LANGGRAPH` flag (`settings.use_langgraph`):
 
-LangGraph remains an installed dependency so that adding a revision round (round 3) or a multi-prompt session does not require pulling in new tooling later. The escape hatch was approved in MVP_DESIGN Amendment 3.14 specifically to keep the orchestrator readable on demo day.
+| Backend | File | Default | Selected when |
+| --- | --- | --- | --- |
+| Function pipeline (1-day MVP) | [src/pipeline/orchestrator.py](../src/pipeline/orchestrator.py) | yes | `USE_LANGGRAPH=false` |
+| LangGraph `StateGraph` | [src/pipeline/orchestrator_lg.py](../src/pipeline/orchestrator_lg.py) | no | `USE_LANGGRAPH=true` |
+
+Both expose the same `run_pipeline(prompt) -> dict` shape, share the helpers in `src/pipeline/_run_utils.py` (`ensure_run`, `topo_order`, `upstream_outputs`, `finalise_run`, `build_summary`), and produce **byte-identical MongoDB rows**. The Streamlit app dispatches at call time so the sidebar toggle (and a status badge under the page title) flips backends without restarting.
+
+**Why both.** The 1-day MVP shipped with the plain function pipeline because LangGraph's `StateGraph` API was overhead we could not justify under demo-day pressure (this was Amendment 3.14's pre-approved escape hatch). The LangGraph backend was added afterwards on the `langgraph` branch as a clean, declarative DAG of nodes \u2014 each node is a thin wrapper that calls the existing stage function and preserves the `emit(...)` progress hooks consumed by the live UI. No business logic, prompts, or DB writes live inside LangGraph nodes.
+
+**What LangGraph buys us.** A typed shared state (`GraphState: TypedDict`), declarative `add_node`/`add_edge` wiring, a self-rendering Mermaid diagram (visible in the *\ud83d\udd78\ufe0f Workflow* tab via `graph.get_graph().draw_mermaid()`), and a clean place to add conditional edges or parallel branches in the future.
+
+**What we deliberately do not use.** No `Checkpointer` (MongoDB already persists every artifact), no `ToolNode` (our LLM client wraps tool calls itself), no `MessagesState` (the blackboard already persists every message to `coalition_messages`), no `Send` / `Map` parallelism over subtasks in this PR (preserves the existing topological-order semantics). Replay stays on the function backend regardless of the flag, because replay must make zero LLM calls and is a strict read-only path against MongoDB.
+
+Full integration notes, node-to-stage mapping, and future-work boundaries: [LANGGRAPH.md](LANGGRAPH.md).
 
 ---
 

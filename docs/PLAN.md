@@ -1,6 +1,11 @@
 # PLAN.md — Agent Coalitions MVP (1-day build)
 
 > **Status:** Phase A complete (workflow.txt). All ambiguities in `MVP_DESIGN.md` have been resolved with the lead (2026-05-01). This document is the executable plan; the coding agent works through it commit-by-commit.
+> **Post-build update (2026-05-02):** gates G1–G10 shipped on `master`; the
+> LangGraph escape hatch documented in §3.14 was used at G6 (function
+> pipeline). LangGraph has since been **adopted as a parallel backend on
+> the `langgraph` branch** (opt-in via `USE_LANGGRAPH`). See
+> [LANGGRAPH.md](LANGGRAPH.md) and [HANDOVER.md](HANDOVER.md) §6.
 > **Source of truth:** `MVP_DESIGN.md` (with amendments listed in §3 below). `GAME_THEORY_PRIMER.md` is reference material.
 > **Naming:** the word *"market"* is banned across code, UI, DB, and docs. We use *coalitions* / *delegation system*. Appendix A of `MVP_DESIGN.md` retains its historical discussion of why we don't use the word — that text is consistent with the ban and stays.
 
@@ -258,6 +263,16 @@ Canonical string, used verbatim in UI banner, every artifact, and final-report h
 
 Use LangGraph for the orchestrator. **Escape hatch:** if LangGraph wiring blocks gate G6 by more than ~30 minutes, the agent commits a plain function-based `src/orchestrator.py` and proceeds. This decision is pre-approved.
 
+> **Outcome (post-build, 2026-05-02):** the escape hatch was used — the
+> 1-day build shipped with the plain function pipeline
+> (`src/pipeline/orchestrator.py`). LangGraph was subsequently adopted on
+> the `langgraph` branch as a **parallel** orchestrator
+> (`src/pipeline/orchestrator_lg.py`) behind a `USE_LANGGRAPH` runtime
+> flag, so the demo path is unaffected. Both backends share the
+> `src/pipeline/_run_utils.py` helpers and write byte-identical MongoDB
+> rows. Full rationale, integration map, and what is deliberately out of
+> scope: [LANGGRAPH.md](LANGGRAPH.md).
+
 ---
 
 ## 4. TODO.md (created at commit #0)
@@ -267,6 +282,12 @@ Use LangGraph for the orchestrator. **Escape hatch:** if LangGraph wiring blocks
 
 - [ ] Replace hand-authored data/skills_seed.json (~30–50 entries) with 150 real skills.sh entries.
 - [ ] Replace mock LLM judge with real LLM judge in mock-mode parity tests.
+      *(Both judges already exist in production code: real LLM judge in
+      `src/pipeline/validation.py`; deterministic mock judge in
+      `src/llm/mock.py::_judge`. What is still missing is **automated
+      parity tests** that exercise both and assert their outputs share
+      the same shape and score range. Test-coverage gap, not a runtime
+      gap.)*
 - [ ] Run §11.2 strategy comparison (A/B/C) — implement gate G12.
 - [ ] AI hero render (gate G13).
 - [ ] Tighten validator: include dynamic-load factor, fatigue check stub.
@@ -297,7 +318,7 @@ Run the listed self-check before committing. Stop and report on failure.
 
 ## 6. Decisions & assumptions
 
-- **Orchestrator:** LangGraph with pre-approved escape hatch to plain functions if it blocks G6.
+- **Orchestrator:** LangGraph with pre-approved escape hatch to plain functions if it blocks G6. *(Escape hatch was taken on master; LangGraph backend now lives on the `langgraph` branch — see §3.14.)*
 - **Single coding agent**, sequential, gate-by-gate. Each gate is an independent rewind point.
 - **Mock mode is the development default** through Phases 1–5; real LLMs only at G7.
 - Workspace root is the project root; no nested `agent_market/` dir; DB renamed `agent_coalitions`.
