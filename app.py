@@ -54,7 +54,7 @@ def run_pipeline(prompt: str):
 from src.core.progress import set_listener  # noqa: E402
 
 st.set_page_config(
-    page_title="Coalition Formation over a Skill Marketplace",
+    page_title="Agentic Team Formation over a Skill Marketplace",
     page_icon="🔮",
     layout="wide",
 )
@@ -204,7 +204,7 @@ with st.sidebar:
 # ----------------------------------------------------------------------------
 # Header
 # ----------------------------------------------------------------------------
-st.title("🔮  Coalition Formation over a Skill Marketplace")
+st.title("🔮  Agentic Team Formation over a Skill Marketplace")
 st.caption(
     "Decomposing and executing complex tasks with multi-agent teams."
 )
@@ -1019,7 +1019,7 @@ digraph MongoDB {
   decomp  [label="Decomposer\\n(LLM)", fillcolor="#eaf3ff" color="#4a6fa5"];
   embed   [label="OpenAI\\nembeddings\\n(1536-d)", fillcolor="#eaf3ff" color="#4a6fa5"];
   match   [label="Skill matching\\n+ coverage floor\\n+ set-cover", fillcolor="#eaf3ff" color="#4a6fa5"];
-  bb      [label="Blackboard\\ncollaboration", fillcolor="#eaf3ff" color="#4a6fa5"];
+  bb      [label="Agent comms\\n(blackboard)", fillcolor="#eaf3ff" color="#4a6fa5"];
   synth   [label="Synthesise →\\nValidate →\\nCost → Report", fillcolor="#eaf3ff" color="#4a6fa5"];
   rep     [label="Shapley\\n+ reputation\\nupdate", fillcolor="#eaf3ff" color="#4a6fa5"];
 

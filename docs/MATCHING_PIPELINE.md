@@ -206,6 +206,67 @@ The vector-search layer is the most important step of the pipeline
 to get right, and it's the one most often hand-waved in agent-system
 papers, so this section spells out the full chain.
 
+### Which embedding model, and where does it run?
+
+We do **not** use a local embedding library (Sentence-Transformers,
+HuggingFace `transformers`, FastEmbed). We use a *hosted* embedding
+model: **OpenAI's `text-embedding-3-small`**, accessed over HTTPS
+through the official `openai` Python SDK. OpenAI publishes two
+distinct families of models on the same API — chat models such as
+`gpt-4o-mini` (autoregressive decoders that emit text) and embedding
+models such as `text-embedding-3-small` (transformer encoders that
+emit a fixed-size vector). We use both: chat models for the
+decomposer, the marshals, the agents, and the synthesiser; the
+embedding model only for the retrieval layer described below. The
+embedding endpoint returns 1536 float-32 values per input string;
+nothing about the model weights ever runs locally. The reason for
+picking the hosted model over an open-source one is empirical: the
+skill marketplace contains short, technical phrases like *"cable-stayed
+bridge systems"* and *"aerodynamics and CFD"*, and OpenAI's third-generation
+embeddings give noticeably cleaner cosine separation between domains
+than the small open-source models commonly used in tutorials. The
+trade-off is a network call per query and a small per-token cost,
+both of which are negligible at the scale of a single hackathon
+demo (≈ 70 catalogue embeddings + a handful of query embeddings per
+run, well under one cent in total).
+
+### Are the catalogue embeddings stored already-vectorised in MongoDB?
+
+Yes. This is the key architectural decision. Each document in the
+`skills` collection is shaped like:
+
+```json
+{
+  "skill_id": "cable-stayed-bridge-systems",
+  "name": "Cable-Stayed Bridge Systems",
+  "description": "Design and analysis of cable-stayed bridges …",
+  "tags": ["cable-stayed", "bridge", "civil"],
+  "prior_reputation": 0.86,
+  "weekly_installs": 7400,
+  "embedding": [0.0123, -0.0451, 0.0089, …]   // 1536 floats, persisted
+}
+```
+
+The `embedding` field is computed **once**, at seeding time, by the
+seed script (`python -m src.scripts.seed_skills`), and written
+straight into the document. The catalogue is therefore "vectorised
+at rest": after seeding, the marketplace lives in MongoDB as a set
+of pre-computed 1536-dimensional points, and Atlas builds a cosine
+HNSW index on top of that field. At query time we never re-embed
+the catalogue; only the query vector is fresh. This matters for
+three reasons. First, retrieval becomes a pure server-side
+aggregation — no LLM in the loop, no model inference on the
+catalogue side, latency in the millisecond range. Second, the
+pipeline is replayable: a fixed catalogue plus a fixed query
+deterministically returns the same nearest neighbours every time.
+Third, the system stays cheap: embedding the catalogue costs roughly
+$0.0001 *in total* once, and each subsequent run only pays for the
+handful of query embeddings it actually issues. The standing
+constraint is that query and catalogue vectors must be produced by
+the *same* model — cosine across embedding spaces is meaningless —
+so the codebase pins `text-embedding-3-small` everywhere; changing
+the model would require re-seeding the catalogue.
+
 ### Indexing time (one-shot, when the catalog is seeded)
 
 The catalog lives in `data/skills_seed.json` (70 skills as of this
