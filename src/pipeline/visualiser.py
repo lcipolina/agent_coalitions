@@ -551,7 +551,25 @@ def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
     else:
         try:
             geometry = _llm_geometry(spec)
-            source = "llm"
+            # Sanity check: bridges need at minimum a deck + piers + some
+            # detail (cables, trusses, arches). Empirically, a credible
+            # bridge geometry has > 20 primitives. If the LLM returns a
+            # stripped-down box-pile (e.g. "deck + 3 pylons"), fall back
+            # to the deterministic recipe so the demo always shows a
+            # legible bridge.
+            n_prims = len(geometry.get("primitives", []))
+            n_lines = sum(1 for p in geometry.get("primitives", [])
+                          if p.get("kind") == "line")
+            if n_prims < 20 or n_lines == 0:
+                log.warning(
+                    "visualiser LLM returned sparse geometry "
+                    "(%d primitives, %d lines); using deterministic fallback",
+                    n_prims, n_lines,
+                )
+                geometry = _deterministic_primitives(spec)
+                source = "deterministic_fallback_sparse"
+            else:
+                source = "llm"
         except Exception as exc:  # noqa: BLE001 - any LLM failure is recoverable
             log.warning("visualiser LLM failed (%s); using deterministic fallback",
                         exc)
