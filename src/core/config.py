@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Pipeline
     use_mock_llm: bool = Field(True, alias="USE_MOCK_LLM")
+    use_langgraph: bool = Field(False, alias="USE_LANGGRAPH")
     seed: int = Field(42, alias="SEED")
 
 

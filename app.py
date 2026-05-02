@@ -21,7 +21,13 @@ import streamlit as st  # noqa: E402
 
 from src.core.config import settings  # noqa: E402
 from src.db.client import get_db  # noqa: E402
-from src.pipeline.orchestrator import run_pipeline  # noqa: E402
+# Pick the pipeline backend at import time. The LangGraph backend is a
+# parallel implementation behind the USE_LANGGRAPH flag — see
+# docs/LANGGRAPH.md. Both backends expose the same run_pipeline() shape.
+if settings.use_langgraph:  # noqa: E402
+    from src.pipeline.orchestrator_lg import run_pipeline  # noqa: E402
+else:  # noqa: E402
+    from src.pipeline.orchestrator import run_pipeline  # noqa: E402
 from src.core.progress import set_listener  # noqa: E402
 
 st.set_page_config(
