@@ -21,14 +21,23 @@ import streamlit as st  # noqa: E402
 
 from src.core.config import settings  # noqa: E402
 from src.db.client import get_db  # noqa: E402
-# Both pipeline backends are imported up-front so the sidebar toggle can
-# switch between them at runtime without a Streamlit restart. The backend
-# dispatch happens inside ``run_pipeline`` below; see docs/LANGGRAPH.md.
 from src.pipeline.orchestrator import run_pipeline as _run_pipeline_fn  # noqa: E402
-from src.pipeline.orchestrator_lg import (  # noqa: E402
-    build_graph as _build_lg_graph,
-    run_pipeline as _run_pipeline_lg,
-)
+
+
+# LangGraph is an optional dependency: if it isn't installed, the toggle
+# in the sidebar is disabled and the rest of the app still works.
+try:
+    from src.pipeline.orchestrator_lg import (  # noqa: E402
+        build_graph as _build_lg_graph,
+        run_pipeline as _run_pipeline_lg,
+    )
+    LANGGRAPH_AVAILABLE = True
+    LANGGRAPH_IMPORT_ERROR: str | None = None
+except Exception as _exc:  # pragma: no cover — import-time fallback
+    _build_lg_graph = None  # type: ignore[assignment]
+    _run_pipeline_lg = None  # type: ignore[assignment]
+    LANGGRAPH_AVAILABLE = False
+    LANGGRAPH_IMPORT_ERROR = f"{type(_exc).__name__}: {_exc}"
 
 
 def run_pipeline(prompt: str):
@@ -37,8 +46,8 @@ def run_pipeline(prompt: str):
     Reading the flag at call time (not import time) lets the sidebar
     toggle flip backends without restarting Streamlit.
     """
-    if settings.use_langgraph:
-        return _run_pipeline_lg(prompt)
+    if settings.use_langgraph and LANGGRAPH_AVAILABLE:
+        return _run_pipeline_lg(prompt)  # type: ignore[misc]
     return _run_pipeline_fn(prompt)
 
 
@@ -149,7 +158,7 @@ with st.sidebar:
     # Pipeline backend toggle (function vs LangGraph)
     # ------------------------------------------------------------------
     if "lg_toggle" not in st.session_state:
-        st.session_state.lg_toggle = bool(settings.use_langgraph)
+        st.session_state.lg_toggle = bool(settings.use_langgraph) and LANGGRAPH_AVAILABLE
 
     lg_on = st.toggle(
         "LangGraph backend",
@@ -158,8 +167,10 @@ with st.sidebar:
             "OFF = plain function pipeline (src/pipeline/orchestrator.py).\n"
             "ON  = LangGraph StateGraph (src/pipeline/orchestrator_lg.py).\n"
             "Both produce identical MongoDB rows; switch any time."
+            + ("" if LANGGRAPH_AVAILABLE
+               else f"\n\nDisabled: LangGraph not importable ({LANGGRAPH_IMPORT_ERROR}).")
         ),
-        disabled=st.session_state.running,
+        disabled=st.session_state.running or not LANGGRAPH_AVAILABLE,
     )
     if lg_on != st.session_state.lg_toggle:
         st.session_state.lg_toggle = lg_on
@@ -888,7 +899,11 @@ with tab_workflow:
     st.info(f"Active backend: **{backend_now}**")
 
     try:
-        _g = _build_lg_graph()
+        if not LANGGRAPH_AVAILABLE:
+            raise RuntimeError(
+                f"LangGraph package not importable: {LANGGRAPH_IMPORT_ERROR}"
+            )
+        _g = _build_lg_graph()  # type: ignore[misc]
         _graph_obj = _g.get_graph()
         _mermaid_src = _graph_obj.draw_mermaid()
     except Exception as exc:  # pragma: no cover — surfacing the error helps
@@ -907,10 +922,15 @@ with tab_workflow:
                 "digraph G {",
                 "  rankdir=TB;",
                 "  bgcolor=\"white\";",
+                "  size=\"4,6\";",
+                "  ratio=compress;",
+                "  nodesep=0.18;",
+                "  ranksep=0.22;",
                 "  node [shape=box style=\"rounded,filled\" "
                 "fillcolor=\"#eef3ff\" color=\"#4a6fa5\" "
-                "fontname=\"Helvetica\"];",
-                "  edge [color=\"#4a6fa5\"];",
+                "fontname=\"Helvetica\" fontsize=10 "
+                "margin=\"0.08,0.04\" height=0.3];",
+                "  edge [color=\"#4a6fa5\" arrowsize=0.7];",
             ]
             for n in _node_ids:
                 label = str(n).replace('"', '\\"')
@@ -918,7 +938,10 @@ with tab_workflow:
             for src, tgt in _edges:
                 _dot_lines.append(f'  "{src}" -> "{tgt}";')
             _dot_lines.append("}")
-            st.graphviz_chart("\n".join(_dot_lines), use_container_width=True)
+            # Constrain width with a column so it doesn't stretch full-page.
+            _gv_left, _gv_mid, _gv_right = st.columns([3, 2, 3])
+            with _gv_mid:
+                st.graphviz_chart("\n".join(_dot_lines), use_container_width=True)
         except Exception as exc:  # pragma: no cover
             st.warning(f"Graphviz render failed ({exc}); falling back to Mermaid source.")
 
