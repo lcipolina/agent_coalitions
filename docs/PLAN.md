@@ -269,7 +269,6 @@ Use LangGraph for the orchestrator. **Escape hatch:** if LangGraph wiring blocks
 - [ ] Replace mock LLM judge with real LLM judge in mock-mode parity tests.
 - [ ] Run §11.2 strategy comparison (A/B/C) — implement gate G12.
 - [ ] AI hero render (gate G13).
-- [ ] Consider §A.4 truthful-reporting incentive mechanism (then we can legitimately call it a market).
 - [ ] Tighten validator: include dynamic-load factor, fatigue check stub.
 - [ ] Cache LLM responses in Mongo `llm_cache` collection (currently skipped).
 ```

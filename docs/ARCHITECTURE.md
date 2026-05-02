@@ -205,7 +205,7 @@ with `α=0.6, β=0.3, γ=0.1, λ=0.4`. We greedily seed with the highest-solo sk
 
 Three deliberate non-choices, each a mistake we did not make:
 
-- **It is not a price-clearing market.**  A truthful-reporting layer with declared confidence and ex-post penalty is a separate, post-hackathon piece of work (see `TODO.md`).
+- **It is not a price-clearing market.**  We deliberately do not call this system a market — there are no prices, no private information, and no incentive-compatibility guarantees. See [MVP_DESIGN.md](MVP_DESIGN.md) Appendix A for the precise framing.
 - **It is not a full Shapley computation.** Full Shapley over even a 15-candidate pool is 2^15 coalitions; the rank-1 + pairwise approximation is closed-form and runs in microseconds, which is the right complexity budget for a demo.
 - **It is not pure top-k cosine.** Pure top-k would silently produce three indistinguishable skills for any subtask whose primary capability has near-duplicates in the index. The complementarity bonus is what makes the assignment *interesting*, and it is the thing the UI's "Coalitions" tab is built to show.
 

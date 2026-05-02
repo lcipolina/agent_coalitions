@@ -943,17 +943,7 @@ This is the framing we use when challenged.
 
 Earlier drafts kept *market* in three places, all colloquial: the Streamlit tab name "Agent Market", the run-button label "Run Agent Market", and the database / project directory name `agent_market`. **As of Amendments 2026-05-01 these are all renamed** (tab → "Assignments", button → "Run Coalitions", DB → `agent_coalitions`, repo layout uses the workspace root). The word *market* survives in this document only as historical / philosophical discussion of why we don't use it.
 
-### A.4 What it would take to legitimately call this a market
-
-For completeness, the smallest extension that would make "market" defensible:
-
-- Give each agent a **strategy space** — e.g., a `declared_confidence` value submitted before scoring.
-- Make the orchestrator's selection depend on declared confidence.
-- Penalise over-claiming after the fact by comparing declared confidence to the LLM-judge's score on the agent's contribution, and feed the discrepancy back into reputation.
-
-That is a *truthful-reporting incentive mechanism*, the minimum content to justify the word. It is roughly an extra hour of work and we may add it as a stretch goal. Until then, we use the more honest term.
-
-### A.5 Suggested reading
+### A.4 Suggested reading
 
 - Roth, A. E. (2002). *The Economist as Engineer: Game Theory, Experimentation, and Computation as Tools for Design Economics.* Econometrica, 70(4).
 - Roth, A. E., Sönmez, T., & Ünver, M. U. (2004). *Kidney exchange.* Quarterly Journal of Economics, 119(2).
