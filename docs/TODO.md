@@ -19,6 +19,12 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 ## Backlog (post-hackathon)
 
 - [ ] Replace hand-authored `data/skills_seed.json` (~30–50 entries) with **150 real skills.sh entries**. (Q2)
+    - **Investigation outcome (2026-05-02):** Feasible. skills.sh exposes a public JSON API at `https://skills.sh/api/v1/skills` (paginated, ~60 req/min unauth, 600/min with key) returning `{id, name, description, source, installs, sourceType, installUrl, url}` per skill. Each skill's source-of-truth is a GitHub repo with a `SKILL.md` (YAML frontmatter + markdown body).
+    - **Recommended path:** Phase 1 (effort **S**) — `GET /api/v1/skills?view=all-time&per_page=150`, map `name → name`, `description → description`, `source → repo_url`, `installs → installs`; re-embed with `text-embedding-3-small`; upsert into the `skills` collection. Drop `tags[]`, `category`, `github_stars` for Phase 1 (no API source).
+    - **Phase 2 (effort M):** parse each skill's `SKILL.md` to recover tags / category; infer missing tags via semantic similarity to existing catalogue tags.
+    - **Phase 3 (effort M):** secondary GitHub `/repos/{owner}/{repo}` calls for `github_stars` (watch the 60/hr unauth limit; needs a token).
+    - **Watch-outs:** skills.sh `installs` is *cumulative*, not weekly — adjust the Shapley `aᵢ` formula or rename the field to avoid the semantic mismatch. No SLA on schema stability. Respect per-skill licences when displaying attribution.
+    - **Do NOT use:** the `find-skills` skill itself as a connector — it's a human-facing search UI that returns LLM prose, not parseable structured data.
 - [ ] Replace mock LLM judge with the real LLM judge in mock-mode parity tests. The mock currently returns templated mid scores so the radar chart populates. (Q16)
 - [ ] Run §11.2 strategy comparison (A: random, B: top-by-reputation, C: our mechanism) — implement gate **G12**.
 - [x] AI hero render via OpenAI image API + "Concept render" tab — gate **G13**. *(Done on `feat/concept-render-and-cache` branch — `src/pipeline/concept_render.py`, on-demand UI tab, mock-mode SVG placeholder so the demo never blanks out. Not yet merged into `master`.)*
