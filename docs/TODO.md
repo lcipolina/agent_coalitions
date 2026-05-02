@@ -26,6 +26,14 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [x] Cache LLM responses in Mongo `llm_cache` collection (Q12). *(Done on `feat/concept-render-and-cache` branch — opt-in via `USE_LLM_CACHE`, default on; cache hits do not bump the LLM call counter, preserving G9 replay semantics. Not yet merged into `master`.)*
 - [ ] Verify "mock mode" is a single global flag inherited by every LLM call site (currently planned via `src.config.settings.use_mock_llm`); add a runtime assertion that no chat call goes out when the flag is true.
 
+- [ ] **Rename "blackboard" out of the codebase.** The term confused hackathon judges and is jargon we'd rather drop. Replace with `agent_comms` / `team message bus` / `message log` (pick one and use it consistently). Concretely:
+    - Rename module `src/agents/blackboard.py` → `src/agents/agent_comms.py` (or `team_messages.py`); update all imports (`src/agents/marshal.py`, `src/pipeline/execution.py`, tests).
+    - Rewrite docstring on line 1 of the renamed module ("Blackboard helpers — post / read / render…").
+    - Strip the word from comments in `src/llm/mock.py:89`, `src/agents/marshal.py:15`, `src/pipeline/execution.py:1` and `:241`.
+    - Sweep `docs/` for any remaining occurrences (`MVP_DESIGN.md`, `GAME_THEORY_PRIMER.md`, `MATCHING_PIPELINE.md`, `LANGGRAPH.md`, …) and replace with the chosen canonical term.
+    - Keep the MongoDB collection name `coalition_messages` as-is (renaming a live collection is a migration, not a rename).
+    - Verify with `grep -ri "blackboard" .` returning zero matches outside historical changelog/commit-message references.
+
 - [x] Implement LangGraph behind a `USE_LANGGRAPH` flag, with sidebar toggle, status badge, Workflow tab and `docs/LANGGRAPH.md`. *(Done — merged into `master` on demo day; the package is now an optional dependency, the toggle disables itself if the package is missing.)*
 
 ## Out of scope (won't do)

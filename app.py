@@ -548,27 +548,17 @@ with tab_coal:
                 st.markdown("**Agent contributions**")
                 # Build the contributions table.
                 #
-                # We display two views of each agent's contribution:
-                #   - ``shapley``   : the absolute Shapley payoff, i.e. the
-                #     exact closed-form value ``a_i + ½·Σ w_ij`` that this
-                #     agent's skills earn from the induced-subgraph game
-                #     for this subtask. Sums across the table to ``v(N)``,
-                #     the team's total worth — that is the *efficiency*
-                #     axiom of the Shapley value.
-                #   - ``contribution %`` : the same number normalised to
-                #     the team total, so each row reads as "X % of the
-                #     credit for this team's joint output". This is the
-                #     most intuitive per-agent metric for a non-game-
-                #     theory audience. (Equivalent terms in the
-                #     literature: *normalised Shapley value*, *share of
-                #     credit*. NOT the same as *marginal contribution*,
-                #     which is the pre-averaging quantity v(S∪{i}) − v(S).)
+                # We display the *normalised Shapley value* as
+                # ``contribution %`` — the fraction of the team's joint
+                # output fairly attributable to each agent. The raw
+                # Shapley payoff column is hidden by default because
+                # game-theory jargon distracts from the demo; the
+                # percentage view is the intuitive per-agent metric.
                 contribs = a.get("contribution_scores", [])
                 shapley_total = sum(cs.get("shapley", 0.0) for cs in contribs) or 1.0
                 contrib_rows = [
                     {
                         "agent": _agent_label(cs["agent_id"]),
-                        "shapley": round(cs.get("shapley", 0.0), 2),
                         "contribution %": round(
                             100.0 * cs.get("shapley", 0.0) / shapley_total, 1,
                         ),
@@ -584,24 +574,31 @@ with tab_coal:
                 st.caption(f"_Rationale:_ {a.get('selection_rationale', '')}")
         st.markdown("---")
         st.caption(
-            "**About the `shapley` and `contribution %` columns.**  "
-            "`shapley` is the **exact Shapley value** for the induced-subgraph "
+            "**TL;DR.**  `contribution %` = each agent's fair share of the "
+            "team's joint output, computed via the closed-form Shapley value "
+            "of the induced-subgraph game."
+        )
+        st.caption(
+            "`contribution %` is the **Shapley value normalised** \u2014 i.e. "
+            "*the fraction of the team's joint output fairly attributable to "
+            "this agent* (a.k.a. *normalised Shapley value* / *share of credit* "
+            "\u2014 not to be confused with a *marginal contribution* "
+            "`v(S\u222a{i}) \u2212 v(S)`, which is the un-averaged building block "
+            "the Shapley value averages over). The greedy team-formation loop "
+            "uses single marginal contributions to grow the team \u2014 a "
+            "rank-1 Shapley approximation \u2014 and the exact Shapley closed "
+            "form is computed once on the final team purely for display."
+        )
+        st.caption(
+            "The **Shapley value** is the exact payoff for the induced-subgraph "
             "game (Deng\u2013Papadimitriou 1994 closed form): "
             "`\u03c6\u1d62 = a\u1d62 + \u00bd\u00b7\u03a3 w\u1d62\u2c7c`, "
             "where `a\u1d62` is the solo value of the agent's contributed skill "
             "(`0.6\u00b7coverage + 0.3\u00b7prior_reputation + 0.1\u00b7log(1+installs)/max`) "
             "and `w\u1d62\u2c7c = 0.4\u00b7(1 \u2212 cos(e\u1d62, e\u2c7c))` is the pairwise "
             "complementarity to the other team members. By the *efficiency* "
-            "axiom, the column sums to `v(N)` \u2014 the total worth of the team. "
-            "`contribution %` is the same number normalised to that total, i.e. "
-            "*the fraction of the team's joint output fairly attributable to "
-            "this agent* (a.k.a. *normalised Shapley value* / *share of credit* "
-            "— not to be confused with a *marginal contribution* `v(S∪{i}) − v(S)`, "
-            "which is the un-averaged building block the Shapley value averages over). "
-            "The greedy team-formation loop uses single marginal "
-            "contributions to grow the team \u2014 a rank-1 Shapley "
-            "approximation \u2014 and the exact Shapley closed form is "
-            "computed once on the final team purely for display."
+            "axiom, the per-agent \u03c6\u1d62 values sum to `v(N)` \u2014 the "
+            "total worth of the team."
         )
 
 
@@ -1019,7 +1016,7 @@ digraph MongoDB {
   decomp  [label="Decomposer\\n(LLM)", fillcolor="#eaf3ff" color="#4a6fa5"];
   embed   [label="OpenAI\\nembeddings\\n(1536-d)", fillcolor="#eaf3ff" color="#4a6fa5"];
   match   [label="Skill matching\\n+ coverage floor\\n+ set-cover", fillcolor="#eaf3ff" color="#4a6fa5"];
-  bb      [label="Agent comms\\n(blackboard)", fillcolor="#eaf3ff" color="#4a6fa5"];
+  bb      [label="Agent comms", fillcolor="#eaf3ff" color="#4a6fa5"];
   synth   [label="Synthesise →\\nValidate →\\nCost → Report", fillcolor="#eaf3ff" color="#4a6fa5"];
   rep     [label="Shapley\\n+ reputation\\nupdate", fillcolor="#eaf3ff" color="#4a6fa5"];
 
@@ -1059,6 +1056,63 @@ digraph MongoDB {
 
     st.graphviz_chart(_mongo_dot, use_container_width=True)
 
+    st.markdown("##### How to read this diagram")
+    st.markdown(
+        "This is the **end-to-end architecture** of the app. "
+        "Yellow nodes are user-visible "
+        "inputs and outputs; blue nodes are pipeline stages running in Python; "
+        "green cylinders are **MongoDB collections** \u2014 the only stateful "
+        "components in the whole system. Solid arrows are the synchronous "
+        "data path; dashed arrows are reads/writes against MongoDB."
+    )
+    st.markdown(
+        "**Pipeline**\n\n"
+        "1. **User \u2192 Design prompt.**  A free-text brief like *\"design a "
+        "2 km bridge for 50 cars/h, modern aesthetic\"* enters the system.\n"
+        "2. **Decomposer (LLM).**  `gpt-4o-mini` rewrites the prompt as a "
+        "DAG of sub-tasks, each annotated with the *capabilities* it needs "
+        "(e.g. *structural-analysis*, *deck-design*, *cost-estimation*).\n"
+        "3. **OpenAI embeddings (1536-d).**  Each sub-task's capability "
+        "string is vectorised with `text-embedding-3-small`. This is the "
+        "**only place** we call the embedding API at query time \u2014 the "
+        "catalogue itself was vectorised once at seed time.\n"
+        "4. **Skill matching (the heart of the system).**  For every "
+        "sub-task we run `$vectorSearch` against \u2460 the **skills** "
+        "collection (HNSW cosine on `skills_embedding_vector`), apply a "
+        "**coverage floor** (\u2265 0.40 cosine), then a **set-cover** to "
+        "pick the smallest team that covers all required capabilities. "
+        "Agents are looked up from \u2461 the **catalog** (`agents` "
+        "documents carry `skill_ids`).\n"
+        "5. **Agent comms.**  The selected team collaborates on a shared "
+        "log \u2014. Every message (marshal kickoff, "
+        "agent contribution, reconcile) is appended to \u2462 the "
+        "**team message bus** (`coalition_messages`), indexed by "
+        "`(run_id, subtask_id, ts)` so the Agent comms tab can replay it.\n"
+        "6. **Synthesise \u2192 Validate \u2192 Cost \u2192 Report.**  The team's "
+        "raw outputs are merged into a design spec, validated against "
+        "engineering rules, costed, and rendered into a brief. Every "
+        "intermediate artefact (specs, validations, cost lines, 3D renders, "
+        "events) is persisted to \u2463 the **assignment ledger** \u2014 this "
+        "is the *replay surface* that makes any past run reproducible "
+        "from the database alone.\n"
+        "7. **Shapley + reputation update.**  We compute the exact "
+        "closed-form Shapley value for each agent on the final team, and "
+        "write a per-run delta plus the new running reputation to \u2464 "
+        "**persistent memory** (`agents.reputation`, `reputation_updates`). "
+        "These priors feed back into step 4 of *future* runs \u2014 that's "
+        "the cross-run learning loop.\n"
+        "8. **Design brief.**  Report + 3D render + cost estimate handed "
+        "back to the user."
+    )
+    st.markdown(
+        "**The take-away.**  MongoDB is the "
+        "(\u2460), the agent registry (\u2461), the collaboration log "
+        "(\u2462), the audit trail / replay capability (\u2463), and the "
+        "ability to learn across runs (\u2464). The Python pipeline is "
+        "deliberately **stateless** \u2014 every line of state lives in "
+        "one of the five green cylinders."
+    )
+
     st.markdown("---")
     st.markdown("#### The 5 spots, in detail")
     st.table(
@@ -1080,14 +1134,14 @@ digraph MongoDB {
             "What it stores": [
                 "70 skills × 1536-d cosine embeddings (semantic skill index)",
                 "Skill metadata, agent rosters with `skill_ids`",
-                "Append-only blackboard, indexed `(run_id, subtask_id, ts)`",
+                "Append-only message log, indexed `(run_id, subtask_id, ts)`",
                 "Every team formed, every output, every cost — the *replay surface*",
                 "Per-run delta + running reputation across all runs",
             ],
             "Used by": [
                 "Skill matching pipeline (`src/pipeline/matching.py`)",
                 "Set-cover → agent assignment",
-                "Blackboard collaboration loop",
+                "Team collaboration loop",
                 "All pipeline stages + the Replay button",
                 "Reputation stage + future-run priors",
             ],
