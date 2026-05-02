@@ -1,6 +1,6 @@
 # Architecture & Design
 
-This document explains how Agent Coalitions is built and why. It is the long-form companion to `MVP_DESIGN.md` (the contract) and `PLAN.md` (the gate-by-gate execution plan); the cooperative-game-theory background sits in `GAME_THEORY_PRIMER.md`.
+This document explains how Agent Coalitions is built and why. It is the long-form companion to `MVP_DESIGN.md` (the contract); the cooperative-game-theory background sits in `GAME_THEORY_PRIMER.md`.
 
 > **Looking for the elevator pitch?** See [MATCHING_PIPELINE.md](MATCHING_PIPELINE.md) for a single-page walkthrough of how a free-text requirement becomes a working agent team — vector search → coverage floor → greedy coalition → set-cover → Shapley credit — with infographics and the *"MongoDB plays five distinct roles"* cheat-sheet.
 
@@ -333,7 +333,6 @@ cost_model.json              # EUR unit costs for the surveyor
 ARCHITECTURE.md              # this document
 README.md                    # quick-start and live demo flow
 MVP_DESIGN.md                # the contract
-PLAN.md                      # gate-by-gate execution plan
 GAME_THEORY_PRIMER.md        # cooperative-game-theory background
 TODO.md                      # post-hackathon backlog
 

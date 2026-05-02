@@ -1,6 +1,6 @@
 # TODO — post-hackathon backlog
 
-Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amendments 2026-05-01 and `PLAN.md §3` for the resolutions that produced these.
+Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amendments 2026-05-01 for the resolutions that produced these.
 
 ## Hackathon gate status (live)
 
@@ -21,9 +21,20 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [ ] Replace hand-authored `data/skills_seed.json` (~30–50 entries) with **150 real skills.sh entries**. (Q2)
 - [ ] Replace mock LLM judge with the real LLM judge in mock-mode parity tests. The mock currently returns templated mid scores so the radar chart populates. (Q16)
 - [ ] Run §11.2 strategy comparison (A: random, B: top-by-reputation, C: our mechanism) — implement gate **G12**.
-- [x] AI hero render via OpenAI image API + "Concept render" tab — gate **G13**. (Done on `langgraph` branch — `src/pipeline/concept_render.py`, on-demand UI tab, mock-mode SVG placeholder so the demo never blanks out.)
+- [x] AI hero render via OpenAI image API + "Concept render" tab — gate **G13**. *(Done on `feat/concept-render-and-cache` branch — `src/pipeline/concept_render.py`, on-demand UI tab, mock-mode SVG placeholder so the demo never blanks out. Not yet merged into `master`.)*
 - [ ] Tighten validator: dynamic-load factor, fatigue check stub, deflection limit.
-- [x] Cache LLM responses in Mongo `llm_cache` collection (Q12). (Done on `langgraph` branch — opt-in via `USE_LLM_CACHE`, default on; cache hits do not bump the LLM call counter, preserving G9 replay semantics.)
+- [x] Cache LLM responses in Mongo `llm_cache` collection (Q12). *(Done on `feat/concept-render-and-cache` branch — opt-in via `USE_LLM_CACHE`, default on; cache hits do not bump the LLM call counter, preserving G9 replay semantics. Not yet merged into `master`.)*
 - [ ] Verify "mock mode" is a single global flag inherited by every LLM call site (currently planned via `src.config.settings.use_mock_llm`); add a runtime assertion that no chat call goes out when the flag is true.
 
-- [x] Implement LangGraph in another branch (done — `langgraph` branch + `docs/LANGGRAPH.md`).
+- [x] Implement LangGraph behind a `USE_LANGGRAPH` flag, with sidebar toggle, status badge, Workflow tab and `docs/LANGGRAPH.md`. *(Done — merged into `master` on demo day; the package is now an optional dependency, the toggle disables itself if the package is missing.)*
+
+## Out of scope (won't do)
+
+These are deliberate non-goals — listed so the next person doesn't reopen the discussion.
+
+- Distributed agent runtimes / MCP / A2A protocols — single Python process is the point.
+- FEA, CAD, real engineering certification, AR/VR — the disclaimer covers it ("conceptual design … not certified engineering").
+- Exact Shapley computation — the closed-form rank-1 / induced-subgraph value is the right tool here (see `docs/GAME_THEORY_PRIMER.md`).
+- Authentication, rate limiting, deployment scripts, multi-tenancy.
+- Tests beyond the four files in `MVP_DESIGN.md §8`.
+- Bidding LLM calls or strategic agent behaviour — `MVP_DESIGN.md` Appendix A explains why this is *not* a market.
