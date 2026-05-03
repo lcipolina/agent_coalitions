@@ -6,7 +6,7 @@
 
 ## What this is
 
-A single Python process that takes a free-text brief, decomposes it into a DAG of subtasks, runs MongoDB Atlas Vector Search + pairwise-complementarity team formation to assign 1–3 agents per subtask, lets each team collaborate on a Mongo-backed message log coordinated by a marshal LLM, and synthesises the result into a structured proposal with visualisations and a deterministic validation card.
+A single Python process that takes a prompt for a long and complex tasks, decomposes it into a DAG of subtasks, runs MongoDB Atlas Vector Search + pairwise-complementarity team formation to assign 1–3 agents per subtask, lets each team collaborate on a Mongo-backed message log coordinated by a marshal LLM, and synthesises the result into a structured proposal with visualisations and a deterministic validation card.
 
 **MongoDB Atlas is live.** All thirteen domain collections and the Atlas Vector Search index are real and exercised on every run. The only thing that can be mocked is the LLM layer (chat + embeddings); when mocked, Atlas Vector Search still runs end-to-end — only the query vector changes from an OpenAI embedding to a deterministic SHA-256-seeded pseudo-embedding. Mock mode is the default for the live demo because it finishes a full pipeline run in under five seconds and never depends on network weather.
 
