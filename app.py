@@ -27,12 +27,44 @@ import streamlit as st  # noqa: E402
 # existing pydantic-settings loader picks them up without modification.
 # Locally, st.secrets is empty when no .streamlit/secrets.toml exists, so
 # this loop is a no-op and the .env file is used as before.
-try:
-    for _k, _v in st.secrets.items():
-        if isinstance(_v, str) and _k not in os.environ:
-            os.environ[_k] = _v
-except (FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
-    pass
+def _hydrate_env_from_st_secrets() -> None:
+    """Flatten st.secrets (incl. one level of [section] nesting) into os.environ."""
+    try:
+        items = list(st.secrets.items())
+    except (FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
+        return
+    for k, v in items:
+        # Top-level scalar — copy as-is.
+        if isinstance(v, (str, int, float, bool)):
+            os.environ.setdefault(k, str(v))
+            continue
+        # One level of nesting (e.g. [env] or [secrets] section header).
+        try:
+            for sub_k, sub_v in v.items():
+                if isinstance(sub_v, (str, int, float, bool)):
+                    os.environ.setdefault(sub_k, str(sub_v))
+        except AttributeError:
+            continue
+
+
+_hydrate_env_from_st_secrets()
+
+# Surface a clear, non-redacted error if the secret most likely to be
+# missing on a fresh Cloud deploy is still absent. pydantic's default
+# ValidationError is redacted in production, which makes this hard to
+# diagnose from the deployed UI.
+if not os.environ.get("MONGODB_URI"):
+    st.error(
+        "**Configuration error: `MONGODB_URI` is not set.**\n\n"
+        "If you are running locally, copy `.env.example` to `.env` and "
+        "fill in your Atlas connection string.\n\n"
+        "If you are on Streamlit Community Cloud, open **Manage app \u2192 "
+        "Settings \u2192 Secrets** and paste the contents of "
+        "`.streamlit/secrets.toml.example` with real values. The keys "
+        "must be at the top level of the TOML, not under a `[section]` "
+        "header, and values must be quoted strings."
+    )
+    st.stop()
 
 from src.core.config import settings  # noqa: E402
 from src.db.client import get_db  # noqa: E402
