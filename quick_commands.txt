@@ -3,3 +3,7 @@ conda run -n coalitions --no-capture-output streamlit run app.py
 
 # To check the connection to mongodb
 conda run -n coalitions --no-capture-output python scripts/check_mongo.py
+
+# Website
+https://share.streamlit.io/
+https://agentcoalitions.streamlit.app/
