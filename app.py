@@ -67,7 +67,7 @@ if not os.environ.get("MONGODB_URI"):
     st.stop()
 
 from src.core.config import settings  # noqa: E402
-from src.db.client import get_db  # noqa: E402
+from src.db.client import get_db, ping_db  # noqa: E402
 from src.pipeline.orchestrator import run_pipeline as _run_pipeline_fn  # noqa: E402
 
 
@@ -248,6 +248,28 @@ with st.sidebar:
     st.write(f"**Mongo DB:** `{settings.mongodb_db}`")
     st.divider()
     st.header("📜  History")
+
+    # Verify the cluster is reachable before any get_db() call. Otherwise
+    # pymongo raises a redacted ConfigurationError on Streamlit Cloud and
+    # the user has no way to tell DNS failure from auth failure from a
+    # paused Atlas free-tier cluster.
+    _ok, _err = ping_db()
+    if not _ok:
+        st.error(
+            "**MongoDB Atlas is unreachable.**\n\n"
+            f"Underlying error: `{_err}`\n\n"
+            "Common causes:\n"
+            "1. The Atlas free-tier cluster is **paused** \u2014 sign in at "
+            "https://cloud.mongodb.com and click *Resume*.\n"
+            "2. **Network Access** does not allow Streamlit Cloud's egress IPs "
+            "\u2014 add `0.0.0.0/0` to the cluster's IP allow-list.\n"
+            "3. The `MONGODB_URI` secret is wrong (typo, missing `+srv`, "
+            "or password not URL-encoded).\n\n"
+            "Run `python scripts/check_mongo.py` locally to confirm the "
+            "cluster is healthy from your machine."
+        )
+        st.stop()
+
     db = get_db()
     recent = list(
         db.runs.find({}, {"_id": 0, "run_id": 1, "prompt": 1, "status": 1,

@@ -130,6 +130,59 @@ are being made.
 
 ---
 
+## Checking the MongoDB cluster is alive
+
+The Atlas free tier auto-pauses clusters after **60 days of inactivity**, and
+free clusters can also be evicted after long quiet periods. If you suspect
+the cluster has gone away (the deployed app shows
+`pymongo.errors.ConfigurationError`, or the local pipeline times out), run the
+health-check script:
+
+```bash
+conda run -n coalitions --no-capture-output python scripts/check_mongo.py
+```
+
+A healthy cluster prints, in order:
+
+```
+URI    : mongodb+srv://USER:REDACTED@cluster0.kumik7.mongodb.net/...
+DB     : agent_coalitions
+ping   : ok=1.0
+colls  : 14 -> [agents, artifacts, assignments, coalition_messages, ...]
+runs   : 180 documents
+skills : 70 documents
+vidx   : ok (search indexes: ['skills_embedding_vector'])
+```
+
+The script is in [scripts/check_mongo.py](scripts/check_mongo.py); exit code
+is `0` when everything is healthy, non-zero on ping failure or missing
+vector-search index. It's safe to wire into a `cron` job or a GitHub Action
+if you want a daily heartbeat.
+
+**If `ping` fails:**
+
+- Sign in at https://cloud.mongodb.com → check the cluster card. If it shows
+  *"Paused"*, click **Resume**. The free tier resumes in ~30 s.
+- Verify **Network Access → IP Access List** still contains `0.0.0.0/0`
+  (Streamlit Cloud has no fixed egress IPs) and your local IP if you're
+  running locally.
+- Verify the database user in **Database Access** still exists and has the
+  right role (`readWriteAnyDatabase` or scoped to `agent_coalitions`).
+- If the cluster has been **deleted**, restore from the data export under
+  [data/skills_seed.json](data/skills_seed.json) plus
+  [data/llm_replay_cache.json](data/llm_replay_cache.json) by re-running the
+  seed script in [src/db/seed.py](src/db/seed.py). The replay cache means
+  past run outputs aren't recoverable, but the demo can re-run any of the
+  three locked-in prompts from scratch in mock mode.
+
+**If `vidx` is `MISSING`:** the Atlas Vector Search index was dropped (Atlas
+sometimes does this on cluster tier changes). Recreate it from
+[src/db/indexes.py](src/db/indexes.py) — the constant
+`VECTOR_INDEX_DEFINITION` has the JSON the script POSTs to the Atlas Admin
+API.
+
+---
+
 ## Deploying to Streamlit Community Cloud
 
 The app is ready to deploy from this public GitHub repo to

@@ -1,2 +1,5 @@
-
+# To run the app
 conda run -n coalitions --no-capture-output streamlit run app.py
+
+# To check the connection to mongodb
+conda run -n coalitions --no-capture-output python scripts/check_mongo.py
