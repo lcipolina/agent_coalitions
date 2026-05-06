@@ -2,6 +2,9 @@
 
 **Status:** active (post-hackathon, 2026-05-06).
 **Replaces:** `TODO.md` (archived; the hackathon is over).
+**Companion:** [RESEARCH_PROPOSAL.md](RESEARCH_PROPOSAL.md) — the
+*why* and *what* (paper-shaped framing, contributions, target venues).
+This file is the *how* and *when* (phases, sub-tasks, dependencies).
 
 ---
 
