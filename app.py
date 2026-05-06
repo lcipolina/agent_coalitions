@@ -21,6 +21,19 @@ os.environ["USE_MOCK_LLM"] = "true"
 
 import streamlit as st  # noqa: E402
 
+# When deployed to Streamlit Community Cloud, secrets live in the platform's
+# Secrets panel (TOML) rather than a local .env file. Copy any keys from
+# st.secrets into os.environ BEFORE src.core.config is imported, so the
+# existing pydantic-settings loader picks them up without modification.
+# Locally, st.secrets is empty when no .streamlit/secrets.toml exists, so
+# this loop is a no-op and the .env file is used as before.
+try:
+    for _k, _v in st.secrets.items():
+        if isinstance(_v, str) and _k not in os.environ:
+            os.environ[_k] = _v
+except (FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
+    pass
+
 from src.core.config import settings  # noqa: E402
 from src.db.client import get_db  # noqa: E402
 from src.pipeline.orchestrator import run_pipeline as _run_pipeline_fn  # noqa: E402

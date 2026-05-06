@@ -130,6 +130,34 @@ are being made.
 
 ---
 
+## Deploying to Streamlit Community Cloud
+
+The app is ready to deploy from this public GitHub repo to
+[share.streamlit.io](https://share.streamlit.io) — no code changes needed.
+
+1. **Sign in** at [share.streamlit.io](https://share.streamlit.io) with the
+   GitHub account that owns this repo.
+2. **New app** → pick `lcipolina/agent_coalitions`, branch `master`, main file
+   `app.py`. Python version is read from [runtime.txt](runtime.txt) (3.11).
+   Dependencies are read from [requirements.txt](requirements.txt).
+3. **Advanced settings → Secrets**: paste the contents of
+   [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example) with
+   real values. Only `MONGODB_URI` and `MONGODB_DB` are required — the
+   replay cache (`data/llm_replay_cache.json`) handles every demo prompt
+   without OpenAI calls.
+4. **MongoDB Atlas → Network Access**: add `0.0.0.0/0` to the IP allow-list
+   (Streamlit Cloud has no fixed egress IPs). Use a read-mostly user with a
+   strong password, since the cluster is now reachable from anywhere.
+5. **Deploy**. First build takes 2–3 minutes; subsequent pushes to `master`
+   redeploy automatically.
+
+The bridge from `st.secrets` → `os.environ` happens at the top of
+[app.py](app.py) before `src.core.config` is imported, so the same
+pydantic-settings code path is used locally (`.env`) and in the cloud
+(Secrets panel).
+
+---
+
 ## Repository layout
 
 See [docs/ARCHITECTURE.md §11](docs/ARCHITECTURE.md#11-repository-layout). The same document also contains the system-level design rationale behind every non-trivial choice in this codebase.

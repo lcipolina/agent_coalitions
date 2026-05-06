@@ -12,6 +12,9 @@ workflow.txt
 demo_prompts.txt
 pitch.md
 
+# Streamlit Cloud secrets — only the *.example template is committed.
+.streamlit/secrets.toml
+
 # Editor
 .vscode/
 docs/BENCHMARKS.md
