@@ -1,0 +1,217 @@
+# Skills.sh × WildClawBench coverage map (initial bucketing)
+#
+# Inferred-function buckets based on slug + owner namespace. Each row is a
+# best-guess mapping of one skills.sh skill to (a) a functional bucket and
+# (b) the most plausible WildClawBench category, with a 0/1/2 relevance
+# score (0 = no, 1 = adjacent, 2 = direct).
+#
+# Categories: PF=Productivity Flow, CI=Code Intelligence, SI=Social Interaction,
+#             SR=Search & Retrieval, CS=Creative Synthesis, SA=Safety Alignment
+#
+# Source: data/audit/skills_sh_paths.txt (189 slugs, 2026-05-06).
+# This file is the seed for Phase A3 (human re-rating). Edit freely.
+#
+slug,owner,bucket,wcb_category,relevance,note
+# --- Anthropic core skills (clearly the highest-quality entries) ---
+pdf,anthropics,document_format,PF,2,direct match — PF tasks include PDF batch classify
+docx,anthropics,document_format,PF,2,direct
+pptx,anthropics,document_format,PF,2,paper-to-poster (CS) and PF
+xlsx,anthropics,document_format,PF,2,LaTeX-table-extraction adjacent
+canvas-design,anthropics,creative_design,CS,1,web design not video/poster
+brand-guidelines,anthropics,creative_design,CS,1,helps poster CS task
+algorithmic-art,anthropics,creative_design,CS,1,visual puzzle CI?
+doc-coauthoring,anthropics,document_workflow,PF,1,arxiv digest adjacent
+internal-comms,anthropics,communication,SI,1,meeting/email phrasing
+mcp-builder,anthropics,agent_meta,CI,1,not directly useful
+skill-creator,anthropics,agent_meta,,0,meta — about authoring skills
+template-skill,anthropics,agent_meta,,0,meta
+slack-gif-creator,anthropics,creative_design,CS,1,
+theme-factory,anthropics,creative_design,CS,0,
+web-artifacts-builder,anthropics,coding,CI,1,
+webapp-testing,anthropics,coding,CI,1,
+frontend-design,anthropics,creative_design,CS,0,web only
+# --- Firecrawl / web scraping cluster (sweet spot for Search & Retrieval) ---
+firecrawl,firecrawl,web_scraping,SR,2,direct
+firecrawl-agent,firecrawl,web_scraping,SR,2,direct
+firecrawl-crawl,firecrawl,web_scraping,SR,2,direct
+firecrawl-download,firecrawl,web_scraping,SR,2,direct
+firecrawl-map,firecrawl,web_scraping,SR,2,direct
+firecrawl-scrape,firecrawl,web_scraping,SR,2,direct
+firecrawl-search,firecrawl,web_scraping,SR,2,direct
+just-scrape,hugmouse,web_scraping,SR,2,direct
+audit-website,squirrelscan,web_scraping,SR,1,
+# --- Lark (Chinese Slack) — actually maps to Social Interaction ---
+lark-approval,larksuite,collaboration,SI,2,escalation routing analogue
+lark-attendance,larksuite,collaboration,SI,1,
+lark-doc,larksuite,collaboration,SI,1,
+lark-okr,larksuite,collaboration,SI,1,
+lark-slides,larksuite,document_format,CS,1,paper-to-poster?
+lark-wiki,larksuite,collaboration,SI,1,
+# --- Coding / dev workflow (Code Intelligence) ---
+test-driven-development,obra,coding_practice,CI,2,
+tdd,obra,coding_practice,CI,2,
+systematic-debugging,obra,coding_practice,CI,2,SAM3 / debugging tasks
+improve-codebase-architecture,obra,coding_practice,CI,2,
+finishing-a-development-branch,obra,coding_practice,CI,1,
+dispatching-parallel-agents,obra,agent_meta,CI,1,
+subagent-driven-development,obra,agent_meta,CI,1,
+using-git-worktrees,obra,coding_practice,CI,1,
+git-commit,obra,coding_practice,CI,1,
+receiving-code-review,obra,coding_practice,CI,1,
+requesting-code-review,obra,coding_practice,CI,1,
+verification-before-completion,obra,coding_practice,CI,1,
+executing-plans,obra,coding_practice,CI,1,
+writing-plans,obra,coding_practice,CI,1,
+playwright-best-practices,microsoft,coding,CI,1,e2e testing
+playwright-cli,microsoft,coding,CI,1,
+typescript-advanced-types,wshobson,coding,CI,1,
+nodejs-backend-patterns,wshobson,coding,CI,1,
+tailwind-design-system,wshobson,coding,CI,0,front-end only
+shadcn,shadcn,coding,CI,0,front-end only
+shadcn-ui,shadcn,coding,CI,0,
+react:components,emilkowalski,coding,CI,0,
+develop-userscripts,xixu-me,coding,CI,1,
+github-actions-docs,xixu-me,coding,CI,1,
+# --- Vercel / Next.js cluster — narrow web-app focus ---
+deploy-to-vercel,vercel-labs,coding,CI,0,
+vercel-composition-patterns,vercel-labs,coding,CI,0,
+vercel-react-best-practices,vercel-labs,coding,CI,0,
+vercel-react-native-skills,vercel-labs,coding,CI,0,
+web-design-guidelines,vercel-labs,coding,CI,0,
+agent-browser,vercel-labs,web_scraping,SR,2,
+next-best-practices,vercel-labs,coding,CI,0,
+find-skills,vercel-labs,agent_meta,,0,human-facing search; explicitly excluded in TODO
+# --- Microsoft Azure cluster — narrow cloud-ops focus ---
+azure-ai,microsoft,cloud_ops,,0,
+azure-ai,microsoft,cloud_ops,,0,
+azure-cloud-migrate,microsoft,cloud_ops,,0,
+azure-compute,microsoft,cloud_ops,,0,
+azure-cost,microsoft,cloud_ops,,0,
+azure-cost-optimization,microsoft,cloud_ops,,0,
+azure-cost-optimization,microsoft,cloud_ops,,0,
+azure-enterprise-infra-planner,microsoft,cloud_ops,,0,
+azure-hosted-copilot-sdk,microsoft,cloud_ops,,0,
+azure-kubernetes,microsoft,cloud_ops,,0,
+azure-messaging,microsoft,cloud_ops,,0,
+azure-observability,microsoft,cloud_ops,,0,
+azure-postgres,microsoft,cloud_ops,,0,
+azure-quotas,microsoft,cloud_ops,,0,
+azure-upgrade,microsoft,cloud_ops,,0,
+airunway-aks-setup,microsoft,cloud_ops,,0,
+entra-agent-id,microsoft,cloud_ops,,0,
+microsoft-foundry,microsoft,cloud_ops,,0,
+microsoft-foundry,microsoft,cloud_ops,,0,
+# --- Firebase cluster — narrow ---
+firebase-ai-logic,firebase,cloud_ops,,0,
+firebase-app-hosting-basics,firebase,cloud_ops,,0,
+firebase-auth-basics,firebase,cloud_ops,,0,
+firebase-basics,firebase,cloud_ops,,0,
+firebase-data-connect,firebase,cloud_ops,,0,
+firebase-firestore-enterprise-native-mode,firebase,cloud_ops,,0,
+firebase-firestore-standard,firebase,cloud_ops,,0,
+firebase-hosting-basics,firebase,cloud_ops,,0,
+developing-genkit-dart,firebase,cloud_ops,CI,0,
+developing-genkit-go,firebase,cloud_ops,CI,0,
+developing-genkit-js,firebase,cloud_ops,CI,0,
+# --- Convex / Supabase / Neon — DB cloud ---
+convex-create-component,get-convex,cloud_ops,,0,
+convex-migration-helper,get-convex,cloud_ops,,0,
+convex-performance-audit,get-convex,cloud_ops,,0,
+convex-quickstart,get-convex,cloud_ops,,0,
+convex-setup-auth,get-convex,cloud_ops,,0,
+supabase,supabase,cloud_ops,,0,
+supabase-postgres-best-practices,supabase,cloud_ops,,0,
+neon-postgres,neondatabase,cloud_ops,,0,
+# --- Marketing cluster (24 skills, mostly irrelevant to WCB) ---
+ad-creative,coreyhaines31,marketing,,0,
+ai-seo,coreyhaines31,marketing,,0,
+analytics-tracking,coreyhaines31,marketing,,0,
+churn-prevention,coreyhaines31,marketing,,0,
+cold-email,coreyhaines31,marketing,SI,1,email tone
+content-strategy,coreyhaines31,marketing,,0,
+copy-editing,coreyhaines31,marketing,,0,
+copywriting,coreyhaines31,marketing,,0,
+form-cro,coreyhaines31,marketing,,0,
+launch-strategy,coreyhaines31,marketing,,0,
+lead-magnets,coreyhaines31,marketing,,0,
+marketing-ideas,coreyhaines31,marketing,,0,
+marketing-psychology,coreyhaines31,marketing,,0,
+onboarding-cro,coreyhaines31,marketing,,0,
+page-cro,coreyhaines31,marketing,,0,
+pricing-strategy,coreyhaines31,marketing,,0,
+product-marketing-context,coreyhaines31,marketing,,0,
+programmatic-seo,coreyhaines31,marketing,,0,
+revops,coreyhaines31,marketing,,0,
+sales-enablement,coreyhaines31,marketing,,0,
+schema-markup,coreyhaines31,marketing,,0,
+seo-audit,coreyhaines31,marketing,,0,
+site-architecture,coreyhaines31,marketing,,0,
+social-content,coreyhaines31,marketing,,0,
+# --- pbakaus/impeccable cluster (visual taste / design / iteration) ---
+adapt,pbakaus,creative_design,CS,1,
+animate,pbakaus,creative_design,CS,1,
+arrange,pbakaus,creative_design,CS,1,
+audit,pbakaus,creative_design,CS,1,
+brainstorming,pbakaus,creative_design,CS,1,
+clarify,pbakaus,creative_design,CS,0,
+compress,pbakaus,creative_design,CS,1,
+critique,pbakaus,creative_design,CS,1,
+diagnose,pbakaus,creative_design,CS,1,
+enhance-prompt,pbakaus,creative_design,CS,1,
+extract,pbakaus,creative_design,CS,1,
+hyperframes,pbakaus,creative_design,CS,1,
+impeccable,pbakaus,creative_design,CS,1,
+normalize,pbakaus,creative_design,CS,0,
+overdrive,pbakaus,creative_design,CS,0,
+polish,pbakaus,creative_design,CS,1,
+quieter,pbakaus,creative_design,CS,0,
+shape,pbakaus,creative_design,CS,1,
+simple,pbakaus,creative_design,CS,1,
+soultrace,soultrace-ai,creative_design,CS,0,
+teach-impeccable,pbakaus,agent_meta,,0,
+triage,pbakaus,creative_design,CS,1,
+value,pbakaus,creative_design,CS,1,
+zoom-out,pbakaus,creative_design,CS,1,
+# --- mattpocock — mostly TS/dev practice ---
+caveman,mattpocock,coding,CI,1,
+caveman,juliusbrussee,coding,CI,1,
+caveman-commit,mattpocock,coding,CI,1,
+caveman-compress,mattpocock,coding,CI,1,
+caveman-help,mattpocock,coding,CI,1,
+caveman-review,mattpocock,coding,CI,1,
+design-md,mattpocock,coding,CI,0,
+design-taste-frontend,mattpocock,creative_design,CS,0,
+emil-design-eng,emilkowalski,coding,CI,0,
+expo,expo,coding,CI,0,
+extract-design-system,arvindrk,creative_design,CS,1,
+high-end-visual-design,sleekdotdesign,creative_design,CS,1,
+industrial-brutalist-ui,leonxlnx,creative_design,CS,0,
+minimalist-ui,leonxlnx,creative_design,CS,0,
+sleek-design-mobile-apps,leonxlnx,creative_design,CS,0,
+stitch-design-taste,google-labs-code,creative_design,CS,0,
+stitch-loop,google-labs-code,creative_design,CS,0,
+ui-ux-pro-max,leonxlnx,creative_design,CS,0,
+redesign-existing-projects,nextlevelbuilder,creative_design,CS,0,
+native-data-fetching,roin-orca,coding,CI,0,
+remotion-best-practices,remotion-dev,creative_video,CS,2,video editing!
+# --- Image / video / multimodal (rare!) ---
+gpt-image-2,agentspace-so,creative_image,CS,2,outfit-to-model adjacent
+ai-video-generation,degausai,creative_video,CS,2,video dubbing
+heygen-com,heygen-com,creative_video,CS,2,
+# --- Plan / spec / writing ---
+to-issues,obra,planning,CI,1,
+to-prd,obra,planning,CI,1,
+typeset,sentry,document_format,PF,1,
+write-a-skill,obra,agent_meta,,0,
+writing-skills,obra,agent_meta,,0,
+paper-context-resolver,obra,document_workflow,PF,2,arxiv paper digest
+using-superpowers,obra,agent_meta,,0,
+# --- Misc ---
+adapt,obra,agent_meta,,0,
+browser-use,browser-use,web_scraping,SR,2,
+sentry-cli,sentry,coding,CI,1,
+full-output-enforcement,obra,agent_meta,,0,
+grill-me,obra,agent_meta,,0,
+grill-with-docs,obra,agent_meta,,0,
+setup-matt-pocock-skills,mattpocock,agent_meta,,0,
+wonda-cli,inference-skills,agent_meta,,0,
