@@ -145,7 +145,7 @@ conda run -n coalitions --no-capture-output python scripts/check_mongo.py
 A healthy cluster prints, in order:
 
 ```
-URI    : mongodb+srv://USER:REDACTED@cluster0.kumik7.mongodb.net/...
+URI    : mongodb+srv://<user>:<redacted>@<your-cluster>/...
 DB     : agent_coalitions
 ping   : ok=1.0
 colls  : 14 -> [agents, artifacts, assignments, coalition_messages, ...]
