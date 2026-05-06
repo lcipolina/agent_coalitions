@@ -65,6 +65,138 @@ def _line(points: list[list[float]], color: str,
             "color": color, "width": width, "name": name}
 
 
+# --- Smooth mesh helpers (used by airplane / curved-shape recipes) ---------
+def _mesh(verts: list[tuple[float, float, float]],
+          tris: list[tuple[int, int, int]],
+          color: str, name: str,
+          opacity: float = 1.0) -> dict[str, Any]:
+    return {
+        "kind": "mesh",
+        "x": [v[0] for v in verts],
+        "y": [v[1] for v in verts],
+        "z": [v[2] for v in verts],
+        "i": [t[0] for t in tris],
+        "j": [t[1] for t in tris],
+        "k": [t[2] for t in tris],
+        "color": color, "name": name, "opacity": opacity,
+    }
+
+
+def _tube_mesh(centreline: list[tuple[float, float, float]],
+               radii: list[float], segments: int,
+               color: str, name: str) -> dict[str, Any]:
+    """Triangulated tube of varying radius along an arbitrary centreline.
+
+    The cross-section is a circle in the plane perpendicular to the local
+    tangent. Used for fuselage, engine nacelles, columns — anything that
+    reads as a smooth solid of revolution rather than a Lego brick.
+    """
+    import math
+    assert len(centreline) == len(radii) >= 2
+    n = len(centreline)
+    verts: list[tuple[float, float, float]] = []
+    for i, (cx, cy, cz) in enumerate(centreline):
+        # Local tangent (forward direction).
+        if i + 1 < n:
+            tx = centreline[i + 1][0] - cx
+            ty = centreline[i + 1][1] - cy
+            tz = centreline[i + 1][2] - cz
+        else:
+            tx = cx - centreline[i - 1][0]
+            ty = cy - centreline[i - 1][1]
+            tz = cz - centreline[i - 1][2]
+        tn = math.sqrt(tx * tx + ty * ty + tz * tz) or 1.0
+        tx, ty, tz = tx / tn, ty / tn, tz / tn
+        # Build an orthonormal basis (u, v) perpendicular to tangent.
+        # Pick a stable reference: world-up unless tangent is near vertical.
+        if abs(tz) < 0.9:
+            ux, uy, uz = -ty, tx, 0.0      # cross(t, world_up)
+        else:
+            ux, uy, uz = 1.0, 0.0, 0.0
+        un = math.sqrt(ux * ux + uy * uy + uz * uz) or 1.0
+        ux, uy, uz = ux / un, uy / un, uz / un
+        # v = t cross u.
+        vx = ty * uz - tz * uy
+        vy = tz * ux - tx * uz
+        vz = tx * uy - ty * ux
+        r = float(radii[i])
+        for s in range(segments):
+            theta = 2 * math.pi * s / segments
+            ct, st = math.cos(theta), math.sin(theta)
+            verts.append((
+                cx + r * (ux * ct + vx * st),
+                cy + r * (uy * ct + vy * st),
+                cz + r * (uz * ct + vz * st),
+            ))
+    tris: list[tuple[int, int, int]] = []
+    for i in range(n - 1):
+        for s in range(segments):
+            a = i * segments + s
+            b = i * segments + (s + 1) % segments
+            c = (i + 1) * segments + s
+            d = (i + 1) * segments + (s + 1) % segments
+            tris.append((a, b, c))
+            tris.append((b, d, c))
+    # End caps: fan triangulation.
+    cap0_centre = len(verts)
+    verts.append(centreline[0])
+    for s in range(segments):
+        tris.append((cap0_centre, (s + 1) % segments, s))
+    cap1_centre = len(verts)
+    verts.append(centreline[-1])
+    base = (n - 1) * segments
+    for s in range(segments):
+        tris.append((cap1_centre, base + s, base + (s + 1) % segments))
+    return _mesh(verts, tris, color, name)
+
+
+def _wing_mesh(root_le: tuple[float, float, float],
+               root_chord: float, tip_chord: float,
+               span: float, sweep: float, dihedral: float,
+               thickness: float, sign: float,
+               color: str, name: str) -> dict[str, Any]:
+    """Tapered swept wing approximated as a thin diamond-section prism.
+
+    ``root_le``  : leading-edge point at the wing root (x, y, z).
+    ``sign``     : +1 for right wing, -1 for left wing.
+    ``sweep``    : leading-edge x-offset at the tip (positive = aft).
+    ``dihedral`` : tip z-offset above the root (positive = up).
+    """
+    rx, ry, rz = root_le
+    tip_y = ry + sign * span
+    tip_x_le = rx + sweep
+    tip_z = rz + dihedral
+    # 4 leading/trailing edge points (root LE, root TE, tip LE, tip TE).
+    rle = (rx, ry, rz)
+    rte = (rx + root_chord, ry, rz)
+    tle = (tip_x_le, tip_y, tip_z)
+    tte = (tip_x_le + tip_chord, tip_y, tip_z)
+    # Diamond cross-section: top and bottom mid-chord ridge points to fake
+    # an aerofoil thickness. Top point sits above the chord at 30% from LE.
+    def mid(a, b, frac, dz):
+        return (a[0] + (b[0] - a[0]) * frac,
+                a[1] + (b[1] - a[1]) * frac,
+                a[2] + (b[2] - a[2]) * frac + dz)
+    rmid_top = mid(rle, rte, 0.30, +thickness / 2)
+    rmid_bot = mid(rle, rte, 0.30, -thickness / 2)
+    tmid_top = mid(tle, tte, 0.30, +thickness / 2)
+    tmid_bot = mid(tle, tte, 0.30, -thickness / 2)
+    verts = [rle, rte, tle, tte, rmid_top, rmid_bot, tmid_top, tmid_bot]
+    # 0:rle 1:rte 2:tle 3:tte 4:rTop 5:rBot 6:tTop 7:tBot
+    # Top surface (LE -> top ridge -> TE), bottom surface (LE -> bot -> TE).
+    tris = [
+        # Top surface.
+        (0, 4, 2), (4, 6, 2), (4, 1, 6), (1, 3, 6),
+        # Bottom surface.
+        (0, 2, 5), (5, 2, 7), (5, 7, 1), (1, 7, 3),
+        # Root cap (closes the diamond at the fuselage side).
+        (0, 5, 4), (4, 5, 1), (4, 1, 0),
+        # Tip cap.
+        (2, 6, 7), (2, 7, 3),
+    ]
+    return _mesh(verts, tris, color, name)
+
+
 def _support_xs(spec: dict) -> list[float]:
     xs: list[float] = [0.0]
     x = 0.0
@@ -413,6 +545,172 @@ def _generic_primitives(spec: dict[str, Any]) -> dict[str, Any]:
                           0.0, H * 0.25, "#34495e", "station"))
         title = (f"{(spec.get('design_type') or 'rollercoaster').replace('_', ' ')}"
                  f" · {int(L)} m track · {int(H)} m max height")
+    elif ("airplane" in domain or "aircraft" in domain or "airliner" in domain
+          or "plane" in domain or "airplane" in dtype or "aircraft" in dtype
+          or "airliner" in dtype or "jet" in dtype):
+        # Smooth-mesh airliner: cylindrical fuselage with a tapered nose and
+        # tailcone, two tapered swept wings, two underwing engine pods, a
+        # vertical fin and a horizontal stabiliser. All built from
+        # parametric meshes (cylinders + tapered prisms) so the result
+        # reads as a 3D rendering rather than stacked Lego.
+        import math
+        if L < 20.0:
+            L = 38.0
+        if W < 20.0:
+            W = 35.0
+        if H < 8.0:
+            H = 12.0
+        z_belly = H * 0.30
+        fuse_r = max(W * 0.06, 1.5)
+        z_centre = z_belly + fuse_r
+        # --- Fuselage: tapered tube, longer at the nose and tail. -------
+        n_segments = 36                     # along x
+        radial_segs = 28                    # around fuselage
+        nose_frac = 0.10
+        tail_frac = 0.18
+        centreline: list[tuple[float, float, float]] = []
+        radii: list[float] = []
+        for k in range(n_segments + 1):
+            u = k / n_segments              # 0..1 from nose to tail
+            x = -L * 0.05 + u * (L * 1.05)
+            # Radius profile: smooth ogive nose, full radius mid-body,
+            # tapered tailcone.
+            if u < nose_frac:
+                r = fuse_r * math.sin((u / nose_frac) * (math.pi / 2)) ** 0.6
+            elif u > 1.0 - tail_frac:
+                v = (1.0 - u) / tail_frac
+                r = fuse_r * (0.25 + 0.75 * v)
+            else:
+                r = fuse_r
+            centreline.append((x, 0.0, z_centre))
+            radii.append(max(r, 0.05))
+        prims.append(_tube_mesh(centreline, radii, radial_segs,
+                                "#ecf0f1", "fuselage"))
+        # --- Cockpit window band (a darker, slightly raised mesh) -------
+        cockpit_centre: list[tuple[float, float, float]] = []
+        cockpit_r: list[float] = []
+        for k in range(8):
+            u = k / 7
+            x = -L * 0.02 + u * (L * 0.10)
+            r = fuse_r * (0.55 + 0.30 * (1 - u))
+            cockpit_centre.append((x, 0.0, z_centre + r * 0.55))
+            cockpit_r.append(r * 0.35)
+        prims.append(_tube_mesh(cockpit_centre, cockpit_r, 18,
+                                "#1b4f72", "cockpit"))
+        # --- Wings: tapered, swept, slight dihedral ---------------------
+        wing_root_x = L * 0.36
+        wing_root_chord = L * 0.26
+        wing_tip_chord = L * 0.10
+        wing_span = (W - 2 * fuse_r) / 2.0
+        wing_sweep = L * 0.12
+        wing_dihedral = H * 0.10
+        wing_thickness = max(fuse_r * 0.18, 0.4)
+        for sign, label in ((-1.0, "wing_left"), (1.0, "wing_right")):
+            prims.append(_wing_mesh(
+                root_le=(wing_root_x, sign * fuse_r, z_centre),
+                root_chord=wing_root_chord,
+                tip_chord=wing_tip_chord,
+                span=wing_span,
+                sweep=wing_sweep,
+                dihedral=wing_dihedral,
+                thickness=wing_thickness,
+                sign=sign,
+                color="#d5dbdb",
+                name=label,
+            ))
+        # --- Engines: tapered cylinders slung below each wing -----------
+        eng_len = L * 0.18
+        eng_r = fuse_r * 0.55
+        for sign, label in ((-1.0, "engine_left"), (1.0, "engine_right")):
+            # Engine sits at ~55% of the half-span, accounting for sweep.
+            frac = 0.55
+            yc = sign * (fuse_r + frac * wing_span)
+            x_at_frac = wing_root_x + frac * wing_sweep
+            z_at_frac = z_centre + frac * wing_dihedral - wing_thickness * 0.6
+            ec = [
+                (x_at_frac - eng_len * 0.55, yc, z_at_frac - eng_r * 1.2),
+                (x_at_frac - eng_len * 0.20, yc, z_at_frac - eng_r * 1.4),
+                (x_at_frac + eng_len * 0.20, yc, z_at_frac - eng_r * 1.4),
+                (x_at_frac + eng_len * 0.55, yc, z_at_frac - eng_r * 1.2),
+            ]
+            er = [eng_r * 0.85, eng_r, eng_r, eng_r * 0.75]
+            prims.append(_tube_mesh(ec, er, 22, "#566573", label))
+            # Engine pylon connecting nacelle to wing underside.
+            pylon_top = z_at_frac
+            pylon_bot = z_at_frac - eng_r * 1.2
+            prims.append(_box(x_at_frac - eng_len * 0.10,
+                              x_at_frac + eng_len * 0.10,
+                              yc - 0.18, yc + 0.18,
+                              pylon_bot, pylon_top,
+                              "#7f8c8d", f"pylon_{label}"))
+        # --- Horizontal stabiliser (tailplane) --------------------------
+        tail_root_x = L * 0.86
+        tail_root_chord = L * 0.10
+        tail_tip_chord = L * 0.05
+        tail_span = (W * 0.36) / 2.0
+        for sign, label in ((-1.0, "tailplane_left"),
+                            (1.0, "tailplane_right")):
+            prims.append(_wing_mesh(
+                root_le=(tail_root_x, sign * fuse_r * 0.4,
+                         z_centre + fuse_r * 0.15),
+                root_chord=tail_root_chord,
+                tip_chord=tail_tip_chord,
+                span=tail_span,
+                sweep=L * 0.05,
+                dihedral=H * 0.04,
+                thickness=max(fuse_r * 0.12, 0.3),
+                sign=sign,
+                color="#d5dbdb",
+                name=label,
+            ))
+        # --- Vertical fin (treat as a "wing" rotated 90° via dihedral) -
+        fin_root_x = L * 0.78
+        fin_root_chord = L * 0.16
+        fin_tip_chord = L * 0.06
+        fin_height = H * 0.55
+        # We model the fin by emitting two thin meshes mirrored at y=0.
+        fin_thickness = max(fuse_r * 0.18, 0.35)
+        fin_root_top = z_centre + fuse_r * 0.85
+        # 4 corners of the fin in side view:
+        fin_le_root = (fin_root_x, 0.0, fin_root_top)
+        fin_te_root = (fin_root_x + fin_root_chord, 0.0, fin_root_top)
+        fin_le_tip = (fin_root_x + L * 0.08, 0.0, fin_root_top + fin_height)
+        fin_te_tip = (fin_root_x + L * 0.08 + fin_tip_chord, 0.0,
+                      fin_root_top + fin_height)
+        # Diamond ridge front-to-back at the fin's vertical mid-line.
+        def _ridge(a, b, frac, dy):
+            return (a[0] + (b[0] - a[0]) * frac,
+                    a[1] + (b[1] - a[1]) * frac + dy,
+                    a[2] + (b[2] - a[2]) * frac)
+        fin_root_left = _ridge(fin_le_root, fin_te_root, 0.30,
+                               -fin_thickness / 2)
+        fin_root_right = _ridge(fin_le_root, fin_te_root, 0.30,
+                                +fin_thickness / 2)
+        fin_tip_left = _ridge(fin_le_tip, fin_te_tip, 0.30,
+                              -fin_thickness / 2)
+        fin_tip_right = _ridge(fin_le_tip, fin_te_tip, 0.30,
+                               +fin_thickness / 2)
+        fin_verts = [
+            fin_le_root, fin_te_root, fin_le_tip, fin_te_tip,
+            fin_root_left, fin_root_right, fin_tip_left, fin_tip_right,
+        ]
+        fin_tris = [
+            # Left face.
+            (0, 4, 2), (4, 6, 2), (4, 1, 6), (1, 3, 6),
+            # Right face.
+            (0, 2, 5), (5, 2, 7), (5, 7, 1), (1, 7, 3),
+            # Root cap.
+            (0, 5, 4), (4, 5, 1), (4, 1, 0),
+            # Tip cap.
+            (2, 6, 7), (2, 7, 3),
+        ]
+        prims.append(_mesh(fin_verts, fin_tris, "#aeb6bf", "fin"))
+        # --- Centreline reference (subtle, helps camera read direction) -
+        prims.append(_line([[-L * 0.06, 0.0, z_centre],
+                            [L * 1.06, 0.0, z_centre]],
+                           "#34495e", 1.5, "centreline"))
+        title = (f"{(spec.get('design_type') or 'airliner').replace('_', ' ')} "
+                 f"· {int(L)} m fuselage · {int(W)} m wingspan")
     elif "tower" in domain or "tower" in dtype or "skyscraper" in dtype \
             or "building" in domain or "building" in dtype:
         # Stacked floor-plates with a vertical core.

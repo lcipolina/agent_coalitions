@@ -242,8 +242,8 @@ call the same stage functions.
 - Conditional edges (e.g. skip cost on validation fail). Easy to add
   later — the value of this PR is *getting onto LangGraph*, not adding
   new behaviour.
-- Migrating to LangGraph's `MessagesState` for the blackboard
-  collaboration inside `execute_subtask`. The blackboard already
+- Migrating to LangGraph's `MessagesState` for the agent-comms
+  collaboration inside `execute_subtask`. The team message bus already
   persists every message to `coalition_messages`; LangGraph state would
   be a third copy.
 

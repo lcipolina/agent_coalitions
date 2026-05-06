@@ -24,6 +24,7 @@ from typing import Any
 
 from src.core.config import settings
 from src.llm import mock as _mock
+from src.llm import replay as _replay
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +93,13 @@ def embed(text: str) -> list[float]:
     counter.
     """
     if settings.use_mock_llm:
+        # Demo / publish path: prefer captured real responses from
+        # data/llm_replay_cache.json so the curated prompts look like
+        # they did during the hackathon. Unknown payloads fall through
+        # to deterministic stubs in src/llm/mock.py.
+        cached = _replay.lookup("embed", text)
+        if cached is not None:
+            return cached
         return _mock.embed(text)
     key = (settings.openai_embedding_model, text)
     cached = _embed_cache.get(key)
@@ -123,6 +131,10 @@ def chat(prompt: str, role: str = "agent", **kwargs: Any) -> str:
     bump the call counter.
     """
     if settings.use_mock_llm:
+        # See note in ``embed`` — replay first, generic stubs second.
+        cached = _replay.lookup("chat", f"{role}\x1f{prompt}")
+        if cached is not None:
+            return cached
         return _mock.chat(prompt, role=role, **kwargs)
     cache_payload = f"{role}\x1f{prompt}"
     persisted = _cache_get("chat", settings.openai_chat_model, cache_payload)

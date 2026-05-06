@@ -86,7 +86,7 @@ def _decomposer(prompt: str, **_: Any) -> str:
 
 def _marshal_kickoff(prompt: str, subtask_id: str = "T?", **_: Any) -> str:
     # Surface the validation criteria block from the rendered prompt (if any)
-    # so the Blackboard tab shows the marshal briefing the team on what the
+    # so the Agent comms tab shows the marshal briefing the team on what the
     # work will be judged on.
     criteria_block = ""
     if "acceptance criteria" in prompt.lower():

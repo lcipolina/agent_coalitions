@@ -1,4 +1,4 @@
-"""Per-subtask execution loop: assign coalition, run blackboard rounds,
+"""Per-subtask execution loop: assign coalition, run agent-comms rounds,
 write subtask_outputs.
 
 Per Amendment 3.9: agents post in parallel in round 1 (each sees only the
@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 
-from src.agents.blackboard import post
+from src.agents.agent_comms import post
 from src.agents.coalitions import CandidateSkill, form_coalition, shapley_values
 from src.db.client import get_db
 from src.db.writes import insert_with_event, log_event
@@ -238,7 +238,7 @@ def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict],
       1. retrieve candidate skills via vector search
       2. form a coalition of skills + cover them with agents
       3. round 0 marshal kickoff → round 1 agents → round 2 marshal reconcile
-      4. write the assignment, blackboard messages and ``subtask_outputs`` row
+      4. write the assignment, agent-comms messages and ``subtask_outputs`` row
     """
     db = get_db()
     db.subtasks.update_one(

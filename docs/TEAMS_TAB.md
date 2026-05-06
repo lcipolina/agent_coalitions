@@ -10,7 +10,7 @@ The tab is rendered by [`app.py`](../app.py) (search for
 
 > **For the *how does this whole thing work?* view**, see
 > [MATCHING_PIPELINE.md](MATCHING_PIPELINE.md) — it shows the
-> `requirement → vector search → coalition → set-cover → Shapley`
+> `prompt → vector search → coalition → set-cover → Shapley`
 > flow on one page with infographics.
 
 ---
@@ -18,9 +18,10 @@ The tab is rendered by [`app.py`](../app.py) (search for
 ## 1. The page caption
 
 ```
-One team is formed per subtask (T1, T2, …). The orchestrator picks
-skills via Atlas Vector Search on each subtask's required
-capabilities, then a set-cover step assigns concrete agents.
+One team is formed per subtask (T1, T2, …). The orchestrator assigns
+skills to each team via cosine similarity between the subtask's
+required capabilities and the skill marketplace. Skills can be shared
+across teams when capabilities overlap.
 ```
 
 This is the mental model:
@@ -31,7 +32,7 @@ Prompt
   ▼  (LLM decomposer)
 Subtasks T1, T2, … Tn   ← each carries `required_capabilities` (free-text)
   │
-  ▼  (Atlas Vector Search per subtask)
+  ▼  (cosine similarity vs. the skill marketplace, via Atlas Vector Search)
 Skills picked from data/skills_seed.json   ← e.g. "composite-materials"
   │
   ▼  (greedy weighted set-cover, src/agents/set_cover.py)
@@ -57,37 +58,50 @@ Three pieces of information:
   decomposer (or by the deterministic mock decomposer in mock mode).
 - **`agents: …`** — the short labels of the agents on this team. Each
   label is just `"#NNN"` (the numeric suffix of the persistent
-  `agent_id`). The label deliberately does **not** include the
-  agent's owned skills, because the *skills the agent actually
-  contributes for this subtask* are listed in the `skills_contributed`
-  column of the contributions table below — showing them in the label
-  too would be redundant and misleading whenever an agent's broader
-  skill set overlaps domains it isn't currently working in.
+  `agent_id`), or `Marshal` for the synthetic fallback. The label
+  deliberately does **not** include the agent's owned skills, because
+  the *skills the agent actually contributes for this subtask* are
+  listed in the `skills_contributed` column of the contributions table
+  — showing them in the label too would be redundant and misleading
+  whenever an agent's broader skill set overlaps domains it isn't
+  currently working in.
+
+The expander is **collapsed by default** so the page reads as a list
+of team headers; expand the ones you want to inspect.
 
 ---
 
-## 3. The "Skills selected" table
+## 3. The "Skills selected from marketplace" table
 
 This is the **first table inside the expander**. It is the team's
-*toolbox* — the skills the marshal decided this subtask needs.
+*toolbox* — the skills the orchestrator decided this subtask needs.
+
+The caption above the table:
+
+> Each row is one skill this team needs. Skills are picked from the
+> marketplace by cosine similarity against the subtask's required
+> capabilities; `reputation_score` and `weekly_installs` come from
+> the marketplace, and `agent_assigned` shows which team member
+> supplies that skill.
 
 | column            | source                                                                 | meaning                                                                                          |
 | ----------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `skill_id`        | `skills` collection                                                    | Catalogue id, e.g. `composite-materials`. Stable identifier.                                     |
-| `name`            | `skills` collection                                                    | Human-readable name from `data/skills_seed.json`.                                                |
+| `skill_id`        | `skills` collection                                                    | Catalog id, e.g. `composite-materials`. Stable identifier.                                       |
 | `category`        | `skills` collection                                                    | One of `engineering` / `software` / `design` / `management` / `math`. Useful for quick grouping. |
-| `prior_reputation`| `skills` collection                                                    | Skill's standing **in the catalogue**, *not* on this run. Computed once at seed time.            |
+| `name`            | `skills` collection                                                    | Human-readable name from `data/skills_seed.json`.                                                |
+| `reputation_score`| `skills.prior_reputation`                                              | Skill's standing **in the marketplace**, *not* on this run. Computed once at seed time. Renamed in the UI from `prior_reputation` to read as a marketplace-style "score". |
 | `weekly_installs` | `skills` collection                                                    | Marketplace popularity proxy from the seed JSON. Same value for every run.                       |
-| `assigned_to`     | per-team mapping built from `assignments.contribution_scores`          | Which agent on **this** team carries this skill. `—` means no agent on the team had it.          |
+| `agent_assigned`  | per-team mapping built from `assignments.contribution_scores`          | Which agent on **this** team carries this skill. Renamed in the UI from `assigned_to`.           |
 
-**Row order**: the order in which the marshal picked the skills (the
-top-ranked one is first).
+**Row order**: the order in which the orchestrator picked the skills
+(seed first, then by greedy marginal). The first row is the seed
+skill of the coalition.
 
-> **Important**: `prior_reputation` and `weekly_installs` describe the
+> **Important**: `reputation_score` and `weekly_installs` describe the
 > **skill itself**, not the team. They don't change between teams or
 > between runs. They are shown so you can see *why* a skill was a
-> plausible pick — high prior_reputation skills are preferred when
-> Vector Search ties.
+> plausible pick — high `reputation_score` skills are preferred when
+> cosine similarities tie.
 
 ---
 
@@ -98,10 +112,15 @@ This is the **second table inside the expander**. It is the team's
 
 | column                | source                                  | meaning                                                                                                                                                                                                                |
 | --------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `agent`               | `_agent_label(agent_id)`                | Short label of the agent (e.g. `#017`).                                                                                                                                                                                |
-| `shapley`             | `shapley_values()` in `coalitions.py`   | The agent's **exact Shapley value** for this team — the closed-form payoff `φᵢ = aᵢ + ½·Σ wᵢⱼ` for the induced-subgraph game, summed over the skills the agent contributed. Rounded to **2 decimals** for display. By the *efficiency* axiom this column sums to `v(N)`. |
-| `contribution %`      | `100 · shapley / Σ shapley`             | Same number, normalised to 100 % across the team. Reads as "fraction of this team's joint output fairly attributable to this agent". This is the **standardised / normalised Shapley value** — what people often call the *share of credit*. **Not** the same as a *marginal contribution* `v(S∪{i}) − v(S)` (see naming caveat below). |
+| `agent`               | `_agent_label(agent_id)`                | Short label of the agent (e.g. `#017`, or `Marshal`).                                                                                                                                                                  |
+| `contribution %`      | `100 · shapley / Σ shapley`             | The **normalised Shapley value** — fraction of the team's joint output fairly attributable to this agent. Sums to ~100% across the table by the *efficiency* axiom. Rounded to 1 decimal.                              |
 | `skills_contributed`  | computed in set-cover                   | Comma-separated list of skill_ids the agent actually covered for this team. May be a strict subset of the agent's full skill list.                                                                                     |
+
+The raw, unnormalised `shapley` column from the assignment row is
+**not** displayed in the tab — game-theory jargon distracts from the
+demo, so the percentage view is shown alone. The raw values are still
+persisted in `assignments.contribution_scores[*].shapley` if you need
+them in the database.
 
 ### What is the "solo value" `aᵢ` and where does it come from?
 
@@ -111,21 +130,23 @@ evaluated on the singleton coalition `{s}`:
 
 ```
 aᵢ = v({s}) = 0.6·coverage(s, query)              ← cosine match to the subtask
-            + 0.3·prior_reputation(s)             ← the catalogue prior
+            + 0.3·prior_reputation(s)             ← the marketplace prior
             + 0.1·log(1 + installs(s)) / max_log_installs
 ```
 
 This number is **not displayed in the Teams tab**, but it is the
 input to two things:
 
-1. The exact Shapley closed form `φᵢ = aᵢ + ½·Σⱼ wᵢⱼ` shown above.
+1. The exact Shapley closed form `φᵢ = aᵢ + ½·Σⱼ wᵢⱼ` that drives the
+   `contribution %` column.
 2. The greedy team-formation loop, which seeds with the highest-`aᵢ`
    skill and then adds the candidate with the largest single marginal
    contribution at each step.
 
-It also feeds the **Reputation tab** as `mean_contribution_score` —
-the average solo value of the skills an agent contributed across the
-run, used as a quality factor in the per-agent reputation delta.
+It also feeds the per-agent reputation update as
+`mean_contribution_score` — the average solo value of the skills an
+agent contributed across the run, used as a quality factor in the
+reputation delta.
 
 ### What is `wᵢⱼ` (the edge weight)?
 
@@ -149,10 +170,9 @@ A 33% share in a 3-agent team means "roughly equal contributors"; a
 60/30/10 split means one agent both has a strong solo value *and*
 benefits a lot from complementarities with the other two.
 
-> **Naming caveat.** `contribution %`, *normalised Shapley value*
-> and *share of credit* are three names for the same number:
-> `φᵢ / Σⱼ φⱼ · 100 %`. The unnormalised `shapley` column is the raw
-> Shapley payoff in the same units as the solo value formula above.
+> **Naming caveat.** *normalised Shapley value*, *share of credit*,
+> and `contribution %` are three names for the same number:
+> `φᵢ / Σⱼ φⱼ · 100 %`.
 >
 > ⚠️ This is **not** the same as a *marginal contribution* in the
 > game-theory sense, which is `v(S ∪ {i}) − v(S)` — the value an
@@ -170,25 +190,35 @@ benefits a lot from complementarities with the other two.
 Below the two tables:
 
 ```
-_Rationale:_ <one short paragraph>
+_Rationale:_ Seed: <skill> (solo=0.x). +<skill> (marginal=0.y). …
 ```
 
-This is the marshal's natural-language justification for why this
-team makes sense for this subtask. It is the **only** LLM-generated
-field on the page (real-LLM mode); in mock mode it comes from a
-deterministic role-keyed router in `src/llm/mock.py`.
+This is the deterministic build trace of the greedy coalition step:
+the seed skill and its solo value, followed by each subsequent skill
+and its marginal contribution to `v(S)`. It is computed in
+`form_coalition()` in [`src/agents/coalitions.py`](../src/agents/coalitions.py)
+and persisted as `assignments.selection_rationale`. No LLM is involved.
 
 ---
 
-## 6. The footnote at the bottom of the tab
+## 6. The footnotes at the bottom of the tab
 
-```
-**About the `shapley` and `contribution %` columns.** `shapley` is the
-exact Shapley value for the induced-subgraph game …
-```
+After all the team boxes, three captions explain the math, in
+increasing order of detail:
 
-This is just §4 restated for the audience that scrolled past all the
-expanders.
+1. **TL;DR caption.** *"`contribution %` = each agent's fair share
+   of the team's joint output, computed via the closed-form Shapley
+   value of the induced-subgraph game."*
+2. **Naming caption.** Repeats the *normalised Shapley / share of
+   credit / not a marginal contribution* warning from §4.
+3. **Formula caption.** Spells out
+   `φᵢ = aᵢ + ½·Σ wᵢⱼ`,
+   with `aᵢ = 0.6·coverage + 0.3·prior_reputation + 0.1·log(1+installs)/max`
+   and `wᵢⱼ = 0.4·(1 − cos(eᵢ, eⱼ))`, and notes that by the
+   *efficiency* axiom `Σᵢ φᵢ = v(N)`.
+
+These are §§3–4 of this document restated for the audience that
+scrolled past all the expanders.
 
 ---
 
@@ -197,29 +227,33 @@ expanders.
 These are honest weak spots — not bugs, just UI choices that may not
 match your intuition:
 
-1. **`prior_reputation` and `weekly_installs` look static across teams.**
+1. **`reputation_score` and `weekly_installs` look static across teams.**
    They are. They live on the *skill*, not on the assignment. If you
    want them to feel "live", we could remove them from the per-team
    table and show them once in a separate tab, or replace them with a
    per-run figure (e.g. how many teams in this run picked the skill).
 
-2. **`assigned_to = —`** *should no longer happen* after the seeding
-   fix in [`SKILL_SEEDING.md`](SKILL_SEEDING.md), because every skill
-   is now held by at least one agent. If you still see `—`, please
-   send a screenshot — that is a real bug.
+2. **`agent_assigned = —`** *should no longer happen* after the
+   seeding fix described in [`MATCHING_PIPELINE.md` §A.2–A.3](MATCHING_PIPELINE.md#a2-the-full-coverage-invariant),
+   because every skill is now held by at least one agent. If you
+   still see `—`, that is a real bug.
 
 3. **The same skill can appear in two different teams.** This is by
-   design (the caption says so) and reflects the fact that two
+   design (the page caption says so) and reflects the fact that two
    subtasks may share required capabilities. If it feels wrong, the
-   fix is in the marshal step, not here.
+   fix is in the skill-selection step, not here.
 
-4. **A 1-agent team has `contribution % = 100 %` trivially.** The Shapley
-   value of a lone player equals `v({s})` (no orderings to average
-   over). That's not a bug — it is what "fair share" means when
-   there's one player.
+4. **A 1-agent team has `contribution % = 100 %` trivially.** The
+   Shapley value of a lone player equals `v({s})` (no orderings to
+   average over). That's not a bug — it is what "fair share" means
+   when there's one player.
 
 5. **There's no "team total" row.** The aggregate Shapley value
    `v(N) = Σ φᵢ` is computed but not shown. We could surface it as a
    small badge in the expander header.
 
-Tell me which of these you'd like changed and I'll implement.
+6. **The raw `shapley` column is hidden.** Only `contribution %` is
+   shown. The raw payoff is still in MongoDB
+   (`assignments.contribution_scores[*].shapley`) — surfacing it is a
+   one-line change to the `contrib_rows` builder in
+   [`app.py`](../app.py).

@@ -632,7 +632,7 @@ Mock mode is the *fallback if the OpenAI key fails during demo*. It must not be 
 │   ├── matching.py                   # vector search + scoring
 │   ├── coalitions.py                 # pairwise complementarity + greedy
 │   ├── set_cover.py                  # skills → agents
-│   ├── blackboard.py                 # post / read / render log (communication forum)
+│   ├── agent_comms.py                # post / read / render log (team message bus)
 │   ├── marshal.py                    # kickoff + reconcile prompts
 │   ├── execution.py                  # the per-subtask loop
 │   ├── synthesis.py                  # final design spec

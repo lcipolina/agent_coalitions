@@ -14,8 +14,10 @@ import os
 import time
 from typing import Any
 
-# Default to mock mode for the live demo (judges have ~2-3 minutes).
-os.environ.setdefault("USE_MOCK_LLM", "true")
+# The published demo runs entirely from the captured replay cache
+# (data/llm_replay_cache.json) — no OpenAI key, no network calls.
+# Force mock mode here so toggling cannot accidentally hit the API.
+os.environ["USE_MOCK_LLM"] = "true"
 
 import streamlit as st  # noqa: E402
 
@@ -54,12 +56,34 @@ def run_pipeline(prompt: str):
 from src.core.progress import set_listener  # noqa: E402
 
 st.set_page_config(
-    page_title="Agentic Team Formation over a Skill Marketplace",
+    page_title="Cadre — Agentic Team Formation over a Skill Marketplace",
     page_icon="🔮",
     layout="wide",
 )
 
 DEFAULT_PROMPT = "design a 2 km bridge for 50 cars/h, modern aesthetic"
+
+# Curated prompts that have captured LLM responses in
+# data/llm_replay_cache.json. The dropdown is locked to this set so the
+# published demo never tries to call OpenAI.
+DEMO_PROMPTS: list[str] = [
+    "Build me a bridge for 50 cars per hours - modern design",
+    "Build me a rollercoaster for 50 people - modern design",
+    "Build me an airplane for 200 people",
+]
+
+# User-facing labels for the dropdown. The keys above are the **exact**
+# strings that match the captured replay cache; the values below are
+# what we show to the user. Changing only the labels keeps every
+# downstream cache lookup intact.
+DEMO_PROMPT_LABELS: dict[str, str] = {
+    "Build me a bridge for 50 cars per hours - modern design":
+        "Design a bridge for 50 cars per hour \u2014 modern design",
+    "Build me a rollercoaster for 50 people - modern design":
+        "Design a rollercoaster for 50 people \u2014 modern design",
+    "Build me an airplane for 200 people":
+        "Design an airplane for 200 people",
+}
 
 STAGES = [
     ("decompose", "1️⃣  Decompose"),
@@ -125,32 +149,24 @@ _init_state()
 with st.sidebar:
     st.header("⚙️  Mode")
 
-    # Initialise toggle from current settings on first load.
-    if "mock_llm_toggle" not in st.session_state:
-        st.session_state.mock_llm_toggle = bool(settings.use_mock_llm)
+    # Demo lock-down: this build runs from the captured replay cache only.
+    # The Mock LLM toggle (and the live OpenAI path) is intentionally
+    # absent so the published demo cannot make API calls. To re-enable
+    # live mode, revert this block and remove the forced
+    # ``USE_MOCK_LLM=true`` at the top of this file.
+    settings.use_mock_llm = True
 
-    mock_on = st.toggle(
-        "Mock LLM",
-        value=st.session_state.mock_llm_toggle,
-        help=(
-            "ON  = deterministic mock responses (full run in <5s, no API "
-            "calls).\nOFF = real OpenAI calls using the model in `.env` "
-            "(typically 1-2 min per run)."
-        ),
-        disabled=st.session_state.running,
-    )
-    if mock_on != st.session_state.mock_llm_toggle:
-        st.session_state.mock_llm_toggle = mock_on
-        # Mutate the live settings singleton + env var so any subsequent
-        # `chat`/`embed` calls (which read `settings.use_mock_llm` at call
-        # time) pick up the new mode without a restart.
-        settings.use_mock_llm = mock_on
-        os.environ["USE_MOCK_LLM"] = "true" if mock_on else "false"
+    from src.llm import replay as _replay_info  # noqa: E402
 
-    if not mock_on:
+    if _replay_info.is_available():
+        _meta = _replay_info.meta()
+        _exported = (_meta.get("exported_at") or "")[:10]
+        st.success("Replay mode")
+    else:
         st.warning(
-            "Real-LLM mode: each run makes several OpenAI calls and takes "
-            "1-2 minutes. Make sure `OPENAI_API_KEY` is set in `.env`.",
+            "🔒 Replay mode is on but no captured cache was found at "
+            "`data/llm_replay_cache.json`. Generic mock stubs will be "
+            "used. See `scripts/export_llm_cache.py` to capture a run.",
             icon="⚠️",
         )
 
@@ -204,24 +220,28 @@ with st.sidebar:
 # ----------------------------------------------------------------------------
 # Header
 # ----------------------------------------------------------------------------
-st.title("🔮  Agentic Team Formation over a Skill Marketplace")
-st.caption(
-    "Decomposing and executing complex tasks with multi-agent teams."
+st.title("🔮  Cadre")
+st.subheader(
+    "A team of specialized agents for tasks too complex for a single agent."
 )
 st.caption(
-    "Multi-agent team formation over a MongoDB Atlas Vector Search "
-    "skills index."
+    "An orchestrator splits a long task into subtasks and assigns each "
+    "one to a team led by a marshal who coordinates the work. Teams are "
+    "built over a skill marketplace using Shapley values to pick the "
+    "skills and role assignment to staff the agents."
 )
-# Inline backend badge so it's visible from the main pane (not just the
-# sidebar). Flip it from the sidebar toggle.
-_backend_label = (
-    "🕸️ **LangGraph** orchestrator"
-    if settings.use_langgraph
-    else "🧵 **function** orchestrator"
-)
-st.caption(f"Pipeline engine: {_backend_label} — see *Workflow* tab.")
 
-prompt = st.text_input("Design prompt", value=DEFAULT_PROMPT)
+prompt = st.selectbox(
+    "Design prompt",
+    DEMO_PROMPTS,
+    index=0,
+    format_func=lambda p: DEMO_PROMPT_LABELS.get(p, p),
+    help=(
+        "Replay-mode demo: only these three prompts have captured LLM "
+        "responses. To add another prompt, run it once with "
+        "`USE_MOCK_LLM=false` and re-run `scripts/export_llm_cache.py`."
+    ),
+)
 run_col, _ = st.columns([1, 5])
 run_clicked = run_col.button("🚀  Run pipeline", type="primary",
                              disabled=st.session_state.running)
@@ -390,11 +410,11 @@ if metrics:
     c4.metric("Cost (EUR)", f"{cost:,.0f}" if isinstance(cost, (int, float)) else "—")
 
 (
-    tab_dag, tab_coal, tab_bb, tab_val, tab_cost, tab_render,
+    tab_dag, tab_coal, tab_bb, tab_val, tab_render,
     tab_report, tab_reput, tab_workflow, tab_mongo,
 ) = st.tabs([
     "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Agent comms", "\u2705 Validation",
-    "\U0001f4b6 Cost", "\U0001f3a8 Rendering",
+    "\U0001f3a8 Rendering",
     "\U0001f4c4 Report", "\U0001f4c8 Reputation",
     "\U0001f578\ufe0f Workflow", "\U0001f343 MongoDB",
 ])
@@ -494,11 +514,10 @@ with tab_dag:
 # ----- Teams ----------------------------------------------------------------
 with tab_coal:
     st.caption(
-        "One team is formed per subtask (T1, T2, \u2026). The orchestrator picks "
-        "skills via Atlas Vector Search on each subtask's required "
-        "capabilities, then a set-cover step assigns concrete agents. "
-        "Two teams **can** share a skill when their capabilities overlap \u2014 "
-        "that's expected, not a bug."
+        "One team is formed per subtask (T1, T2, \u2026). The orchestrator "
+        "assigns skills to each team via cosine similarity between the "
+        "subtask's required capabilities and the skill marketplace. Skills "
+        "can be shared across teams when capabilities overlap."
     )
     assigns = list(db.assignments.find({"run_id": run_id}, {"_id": 0}))
     if not assigns:
@@ -524,7 +543,15 @@ with tab_coal:
                 f"{', '.join(agent_labels)}",
                 expanded=False,
             ):
-                st.markdown("**Skills selected**")
+                st.markdown("**Skills selected from marketplace**")
+                st.caption(
+                    "Each row is one skill this team needs. Skills are "
+                    "picked from the marketplace by cosine similarity "
+                    "against the subtask's required capabilities; "
+                    "`reputation_score` and `weekly_installs` come from "
+                    "the marketplace, and `agent_assigned` shows which "
+                    "team member supplies that skill."
+                )
                 # Preserve the order in which the team picked the skills.
                 sk_order = a.get("coalition_skill_ids", [])
                 skill_docs = list(db.skills.find(
@@ -540,11 +567,22 @@ with tab_coal:
                 for cs in a.get("contribution_scores", []):
                     for s_id in cs.get("skills_contributed", []):
                         skill_to_agent[s_id] = cs["agent_id"]
-                for sd in skill_docs:
-                    sd["assigned_to"] = _agent_label(
-                        skill_to_agent.get(sd["skill_id"], "\u2014")
-                    )
-                st.dataframe(skill_docs, use_container_width=True, hide_index=True)
+                # Rename the marketplace fields to friendlier display
+                # labels and attach the assigned agent.
+                display_rows = [
+                    {
+                        "skill_id": sd["skill_id"],
+                        "category": sd.get("category", ""),
+                        "name": sd.get("name", ""),
+                        "reputation_score": sd.get("prior_reputation"),
+                        "weekly_installs": sd.get("weekly_installs"),
+                        "agent_assigned": _agent_label(
+                            skill_to_agent.get(sd["skill_id"], "\u2014")
+                        ),
+                    }
+                    for sd in skill_docs
+                ]
+                st.dataframe(display_rows, use_container_width=True, hide_index=True)
                 st.markdown("**Agent contributions**")
                 # Build the contributions table.
                 #
@@ -604,6 +642,14 @@ with tab_coal:
 
 # ----- Agent comms ----------------------------------------------------------
 with tab_bb:
+    st.caption(
+        "**Agentic forum.** This shows the agents' communication while "
+        "solving their subtask. The marshal (\U0001f9ed) starts off the "
+        "conversation and coordinates each round, the agents "
+        "(\U0001f916) contribute their domain expertise, and when the "
+        "team is done the marshal summarises the result back to the "
+        "orchestrator."
+    )
     msgs = list(
         db.coalition_messages.find({"run_id": run_id}, {"_id": 0})
         .sort([("subtask_id", 1), ("round", 1), ("ts", 1)])
@@ -738,54 +784,11 @@ with tab_val:
         )
 
 
-# ----- Cost -----------------------------------------------------------------
-with tab_cost:
-    c = db.cost_estimates.find_one({"run_id": run_id}, {"_id": 0})
-    if not c:
-        st.info("No cost estimate yet.")
-    else:
-        st.metric(f"Total ({c['currency']})", f"{c['total']:,}")
-
-        # Two-bucket conceptual rollup: Materials + Man-hours.
-        items = c.get("line_items", [])
-        rows = []
-        for li in items:
-            label = li.get("category") or li.get("item") or "—"
-            unit = li.get("unit", "")
-            qty = li.get("qty", 1)
-            unit_cost = li.get("unit_cost", 0)
-            sub = li.get("subtotal", 0)
-            if unit == "hours":
-                qty_str = f"{int(qty):,} h"
-                rate_str = f"{int(unit_cost):,} {c['currency']}/h"
-            elif unit == "lump_sum":
-                qty_str = "—"
-                rate_str = f"{int(unit_cost):,} {c['currency']}"
-            else:
-                qty_str = f"{qty:,}"
-                rate_str = f"{int(unit_cost):,} {c['currency']}/{unit}"
-            rows.append({
-                "Category": label,
-                "Quantity": qty_str,
-                "Unit rate": rate_str,
-                f"Subtotal ({c['currency']})": f"{int(sub):,}",
-            })
-        st.dataframe(rows, use_container_width=True, hide_index=True)
-        st.caption(
-            f"Subtotal {c['subtotal']:,} + contingency {c['contingency_pct']}% "
-            f"= **{c['total']:,} {c['currency']}**"
-        )
-        if c.get("rationale"):
-            st.markdown(f"**Surveyor rationale:** {c['rationale']}")
-        st.markdown(f"> {c['narrative']}")
-
-
 # ----- 3D rendering ---------------------------------------------------------
 with tab_render:
     art = db.artifacts.find_one(
         {"run_id": run_id, "kind": "geometry_json"}, {"_id": 0},
     )
-    spec = db.design_specs.find_one({"run_id": run_id}, {"_id": 0})
     if not art:
         st.info(
             "No geometry artifact yet. The orchestrator runs a `visualise` "
@@ -797,17 +800,8 @@ with tab_render:
         from src.ui.render3d import render_geometry
 
         geometry = art["uri_or_inline"]
-        st.caption(
-            f"Generic 3D renderer — plots whatever primitives the visualiser "
-            f"stage produced. {len(geometry.get('primitives', []))} primitives "
-            f"in this artifact."
-        )
         fig = render_geometry(geometry)
         st.plotly_chart(fig, use_container_width=True)
-        with st.expander("Raw design spec (JSON)"):
-            st.json(spec or {}, expanded=False)
-        with st.expander("Raw geometry primitives (JSON)"):
-            st.json(geometry, expanded=False)
 
 
 # ----- Report ---------------------------------------------------------------
@@ -819,14 +813,8 @@ with tab_report:
         st.info("No report yet.")
     else:
         st.caption(
-            "**How this brief is built.** Only the *Introduction* paragraph "
-            "is LLM-generated (Reporter agent, prompt `src/prompts/reporter.j2`). "
-            "Everything else \u2014 design characteristics, validation table, "
-            "cost roll-up, team contributions \u2014 is assembled deterministically "
-            "in `src/pipeline/reporter.py::build_report` from the MongoDB "
-            "rows produced by the earlier stages. There is no separate "
-            "\u201corchestrator agent\u201d writing prose; the orchestrator is the "
-            "Python pipeline that sequences the nine stages."
+            "This brief is built from the structured output of the "
+            "earlier stages."
         )
         # The Report tab is the user-facing artefact: scrub any internal
         # "(mock)" tags that older runs may have written into the markdown
@@ -839,38 +827,65 @@ with tab_report:
 
 # ----- Reputation -----------------------------------------------------------
 with tab_reput:
+    st.caption(
+        "Per-run reputation deltas applied to each agent at the end of the "
+        "pipeline, plus the cumulative reputation persisted on the `agents` "
+        "collection. The reputation update carries to the *next* run \u2014 "
+        "this is gate **G10**, the only piece of cross-run state."
+    )
     deltas = list(
         db.reputation_updates.find({"run_id": run_id}, {"_id": 0})
     )
     if not deltas:
         st.info("No reputation updates yet.")
     else:
-        st.markdown("#### Reputation **delta** for this run (\u0394, applied to each agent)")
+        # Per-run deltas: one row per agent that participated in this run.
         delta_rows = [
             {
                 "agent": _agent_label(d["agent_id"]),
-                **{k: v for k, v in d.items()
-                   if k not in {"agent_id", "delta", "run_id", "reason"}},
+                "delta": round(d.get("delta", 0.0), 4),
+                "subtasks_participated": ", ".join(
+                    d.get("subtasks_participated", [])
+                ) if isinstance(d.get("subtasks_participated"), list)
+                else d.get("subtasks_participated"),
+                "mean_contribution_score": d.get("mean_contribution_score"),
+                "reason": d.get("reason", ""),
             }
             for d in deltas
         ]
+        st.markdown("#### Per-run reputation update")
         st.dataframe(delta_rows, use_container_width=True, hide_index=True)
         st.caption(
-            "**`subtasks_participated`** \u2014 the subtasks in which this "
-            "agent was selected onto the team for this run.  \n"
-            "**`mean_contribution_score`** \u2014 the average **solo value** "
-            "`v({s}) = 0.6\u00b7coverage(s, query) + 0.3\u00b7prior_reputation(s) "
-            "+ 0.1\u00b7log(1+installs)/max_log_installs` of the skills the "
-            "agent contributed, averaged across the subtasks above. It is *not* "
-            "the Shapley share displayed in the Teams tab; it is the simpler "
-            "per-skill quality signal used to weight the reputation update. "
-            "The actual reputation change persisted on the `agents` collection "
-            "is computed as "
-            "`delta = base \u00b7 (0.5 + 0.5\u00b7load_factor) \u00b7 "
-            "(0.5 + 0.5\u00b7mean_contribution_score)`, where `base` is "
-            "`+0.04 / +0.02 / \u20130.04` for a `conceptual_pass / "
-            "pass_with_warnings / fail` validation outcome and "
-            "`load_factor = len(subtasks_participated) / total_subtasks`."
+            "`delta = base \u00b7 (0.5 + 0.5\u00b7load_factor) "
+            "\u00b7 (0.5 + 0.5\u00b7quality_factor)`. "
+            "`base` is the validation outcome reward "
+            "(`+0.04` pass, `+0.02` pass-with-warnings, `\u22120.04` fail). "
+            "`load_factor = |subtasks_participated| / total_subtasks`. "
+            "`quality_factor = mean_contribution_score` = mean solo value "
+            "`a\u1d62` of the skills the agent contributed."
+        )
+
+        agent_ids = [d["agent_id"] for d in deltas]
+        agent_docs = list(db.agents.find(
+            {"agent_id": {"$in": agent_ids}},
+            {"_id": 0, "agent_id": 1, "reputation": 1,
+             "runs_participated": 1, "runs_succeeded": 1},
+        ))
+        cum_rows = [
+            {
+                "agent": _agent_label(a["agent_id"]),
+                "reputation": round(a.get("reputation", 0.0), 4),
+                "runs_participated": a.get("runs_participated", 0),
+                "runs_succeeded": a.get("runs_succeeded", 0),
+            }
+            for a in agent_docs
+        ]
+        st.markdown("#### Cumulative reputation (across all runs)")
+        st.dataframe(cum_rows, use_container_width=True, hide_index=True)
+        st.caption(
+            "Stored on the `agents` collection. Persists across runs \u2014 "
+            "the next prompt sees these as priors via `prior_reputation` "
+            "in step 5 of the matching pipeline."
         )
 
 
@@ -878,12 +893,10 @@ with tab_reput:
 with tab_workflow:
     st.markdown("#### 🕸️  Pipeline workflow graph")
     st.caption(
-        "Compiled `langgraph.StateGraph` from "
-        "[`src/pipeline/orchestrator_lg.py`](src/pipeline/orchestrator_lg.py). "
-        "Both backends (function and LangGraph) execute the same 11 stages "
-        "in this order — when the LangGraph toggle is ON, this graph is "
-        "what actually drives the run; when OFF, it documents the "
-        "equivalent function-pipeline structure."
+        "This is the deterministic pipeline that runs end-to-end on every "
+        "prompt \u2014 from decomposing the task to producing the final "
+        "brief. Every stage's output is persisted, so any run can be "
+        "audited or replayed."
     )
     backend_now = (
         "🕸️ LangGraph (live)" if settings.use_langgraph
@@ -988,10 +1001,14 @@ with tab_workflow:
 with tab_mongo:
     st.markdown("#### 🍃  Where does MongoDB fit?")
     st.caption(
-        "This hackathon is organised by MongoDB, so it's worth being explicit "
-        "about *where* MongoDB sits in this project. Spoiler: in **five** "
-        "distinct places, not one. See [docs/MATCHING_PIPELINE.md](docs/MATCHING_PIPELINE.md) "
-        "for the full walkthrough."
+        "We use a database, MongoDB, to make the project scalable. It is "
+        "used in **five** distinct ways: as the **skill marketplace** "
+        "(Atlas Vector Search retrieves skills by cosine similarity to "
+        "each subtask), as the **agent and reputation store**, as the "
+        "**team message bus**, as the **run ledger** that persists every "
+        "stage's output, and as the **LLM response cache** that powers "
+        "replay-mode demos. The diagram below shows where each collection "
+        "enters the pipeline."
     )
 
     _mongo_dot = """

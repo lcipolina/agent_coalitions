@@ -14,3 +14,5 @@ pitch.md
 
 # Editor
 .vscode/
+docs/BENCHMARKS.md
+scripts/export_llm_cache.py

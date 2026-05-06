@@ -1,7 +1,7 @@
 """Marshal: posts kickoff (round 0) and reconciles contributions (round 2)."""
 from __future__ import annotations
 
-from src.agents.blackboard import post, read
+from src.agents.agent_comms import post, read
 from src.llm.openai_client import chat
 from src.llm.prompts import render
 from src.core.tokens import truncate_to_tokens
@@ -12,7 +12,7 @@ MARSHAL_ID = "agent_marshal"
 def kickoff(run_id: str, subtask: dict, coalition_agent_ids: list[str],
             upstream_summaries: list[dict],
             criteria: list[dict] | None = None) -> str:
-    """Post round-0 marshal kickoff to the blackboard and return its text.
+    """Post round-0 marshal kickoff to the team message bus and return its text.
 
     Briefs the coalition on the subtask, upstream summaries, and the
     prompt-derived acceptance criteria they will eventually be judged on.

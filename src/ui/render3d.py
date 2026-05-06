@@ -7,6 +7,10 @@ The mapping from a design spec to primitives is the responsibility of
 Supported primitives:
   * ``box``  — axis-aligned cuboid via ``go.Mesh3d``.
   * ``line`` — polyline via ``go.Scatter3d`` with ``mode='lines'``.
+  * ``mesh`` — arbitrary triangle mesh via ``go.Mesh3d`` (vertex arrays
+    ``x``, ``y``, ``z`` and triangle index arrays ``i``, ``j``, ``k``).
+    Used by the visualiser to draw smooth shapes (cylinders, cones,
+    tapered wings) rather than axis-aligned boxes.
 """
 from __future__ import annotations
 
@@ -58,6 +62,29 @@ def _line_trace(p: dict[str, Any]) -> go.Scatter3d:
     )
 
 
+def _mesh_trace(p: dict[str, Any]) -> go.Mesh3d:
+    """Generic triangle mesh. Expects ``x``, ``y``, ``z`` vertex lists
+    and ``i``, ``j``, ``k`` triangle index lists."""
+    return go.Mesh3d(
+        x=p["x"], y=p["y"], z=p["z"],
+        i=p["i"], j=p["j"], k=p["k"],
+        color=p.get("color", "#888"),
+        opacity=p.get("opacity", 1.0),
+        name=p.get("name", "mesh"),
+        flatshading=p.get("flatshading", False),
+        hoverinfo="name",
+        showscale=False,
+        lighting=dict(
+            ambient=p.get("ambient", 0.55),
+            diffuse=p.get("diffuse", 0.9),
+            specular=p.get("specular", 0.35),
+            roughness=p.get("roughness", 0.4),
+            fresnel=p.get("fresnel", 0.15),
+        ),
+        lightposition=dict(x=1000, y=-2000, z=3000),
+    )
+
+
 def render_geometry(geometry: dict[str, Any]) -> go.Figure:
     """Build a Plotly figure from a geometry artifact (boxes + polylines)."""
     fig = go.Figure()
@@ -67,6 +94,8 @@ def render_geometry(geometry: dict[str, Any]) -> go.Figure:
             fig.add_trace(_box_trace(prim))
         elif kind == "line":
             fig.add_trace(_line_trace(prim))
+        elif kind == "mesh":
+            fig.add_trace(_mesh_trace(prim))
         # silently ignore unknown kinds — keeps the renderer forward-compatible
 
     axes = geometry.get("axes", {})

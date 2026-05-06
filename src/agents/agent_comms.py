@@ -1,4 +1,10 @@
-"""Blackboard helpers — post / read / render coalition_messages rows."""
+"""Agent-comms helpers — post / read / render coalition_messages rows.
+
+This module is the team message bus: each subtask's coalition uses
+``post`` and ``read`` to exchange ``coalition_messages`` rows during
+the per-subtask execution loop. The MongoDB collection name
+(``coalition_messages``) is preserved for backwards compatibility.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone

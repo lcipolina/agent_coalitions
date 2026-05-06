@@ -1,1 +1,2 @@
 
+conda run -n coalitions --no-capture-output streamlit run app.py

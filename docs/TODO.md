@@ -1,8 +1,8 @@
-# TODO — post-hackathon backlog
+# TODO —
 
 Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amendments 2026-05-01 for the resolutions that produced these.
 
-## Hackathon gate status (live)
+## Gate status (live)
 
 - [x] G1 conda env
 - [x] G2 config + secrets
@@ -16,7 +16,7 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [x] G10 reputation persists across runs (`agents.reputation` accumulates)
 - [ ] G11 demo script (≤90 s)
 
-## Backlog (post-hackathon)
+## Backlog
 
 - [ ] Replace hand-authored `data/skills_seed.json` (~30–50 entries) with **150 real skills.sh entries**. (Q2)
     - **Investigation outcome (2026-05-02):** Feasible. skills.sh exposes a public JSON API at `https://skills.sh/api/v1/skills` (paginated, ~60 req/min unauth, 600/min with key) returning `{id, name, description, source, installs, sourceType, installUrl, url}` per skill. Each skill's source-of-truth is a GitHub repo with a `SKILL.md` (YAML frontmatter + markdown body).
@@ -32,15 +32,8 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [x] Cache LLM responses in Mongo `llm_cache` collection (Q12). *(Done on `feat/concept-render-and-cache` branch — opt-in via `USE_LLM_CACHE`, default on; cache hits do not bump the LLM call counter, preserving G9 replay semantics. Not yet merged into `master`.)*
 - [ ] Verify "mock mode" is a single global flag inherited by every LLM call site (currently planned via `src.config.settings.use_mock_llm`); add a runtime assertion that no chat call goes out when the flag is true.
 
-- [ ] **Rename "blackboard" out of the codebase.** The term confused hackathon judges and is jargon we'd rather drop. Replace with `agent_comms` / `team message bus` / `message log` (pick one and use it consistently). Concretely:
-    - Rename module `src/agents/blackboard.py` → `src/agents/agent_comms.py` (or `team_messages.py`); update all imports (`src/agents/marshal.py`, `src/pipeline/execution.py`, tests).
-    - Rewrite docstring on line 1 of the renamed module ("Blackboard helpers — post / read / render…").
-    - Strip the word from comments in `src/llm/mock.py:89`, `src/agents/marshal.py:15`, `src/pipeline/execution.py:1` and `:241`.
-    - Sweep `docs/` for any remaining occurrences (`MVP_DESIGN.md`, `GAME_THEORY_PRIMER.md`, `MATCHING_PIPELINE.md`, `LANGGRAPH.md`, …) and replace with the chosen canonical term.
-    - Keep the MongoDB collection name `coalition_messages` as-is (renaming a live collection is a migration, not a rename).
-    - Verify with `grep -ri "blackboard" .` returning zero matches outside historical changelog/commit-message references.
+- [x] **Rename "blackboard" out of the codebase.** *(Done 2026-05-06.)* Module renamed to `src/agents/agent_comms.py`; canonical term is **agent comms** (UI tab) / **team message bus** (prose). Imports in `src/agents/marshal.py` and `src/pipeline/execution.py` updated; docstrings + comments scrubbed in `src/agents/agent_comms.py`, `src/agents/marshal.py`, `src/pipeline/execution.py`, `src/llm/mock.py`. Doc sweep applied to `MVP_DESIGN.md`, `LANGGRAPH.md`, `ARCHITECTURE.md`. MongoDB collection `coalition_messages` deliberately left unchanged.
 
-- [x] Implement LangGraph behind a `USE_LANGGRAPH` flag, with sidebar toggle, status badge, Workflow tab and `docs/LANGGRAPH.md`. *(Done — merged into `master` on demo day; the package is now an optional dependency, the toggle disables itself if the package is missing.)*
 
 ## Out of scope (won't do)
 

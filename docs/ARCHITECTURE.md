@@ -358,7 +358,7 @@ src/
   agents/
     coalitions.py            # rank-1 Shapley + pairwise complementarity
     set_cover.py             # weighted greedy skill→agent set cover
-    blackboard.py            # post / read coalition_messages (legacy module name; user-facing label is "communication forum" / "agent comms")
+    agent_comms.py           # post / read coalition_messages (team message bus; user-facing label is "agent comms" / "communication forum")
     marshal.py               # round 0 kickoff + round 2 reconcile
 
   pipeline/

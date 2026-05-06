@@ -102,6 +102,32 @@ only difference is `src.llm.openai_client` routes to OpenAI (or to
 OpenRouter if `OPENAI_BASE_URL` is set). Embeddings always go to
 OpenAI proper via `OPENAI_EMBEDDING_API_KEY`.
 
+### Replay-mode lockdown (publishing the demo without an OpenAI key)
+
+The published build forces `USE_MOCK_LLM=true` and locks the prompt
+input to a small dropdown of curated prompts. Captured real LLM
+responses are read from `data/llm_replay_cache.json` so the pipeline
+looks identical to a real run for those prompts; unknown payloads fall
+back to the deterministic stubs in `src/llm/mock.py`.
+
+To refresh the captured cache:
+
+```bash
+# 1. Run each demo prompt once in real mode (with USE_LLM_CACHE=true,
+#    which is the default). MongoDB's llm_cache collection captures
+#    every chat + embed call.
+USE_MOCK_LLM=false python -m src.run --prompt "<demo prompt 1>"
+USE_MOCK_LLM=false python -m src.run --prompt "<demo prompt 2>"
+USE_MOCK_LLM=false python -m src.run --prompt "<demo prompt 3>"
+
+# 2. Export MongoDB llm_cache → data/llm_replay_cache.json (commit it).
+python scripts/export_llm_cache.py
+```
+
+The Streamlit sidebar shows a "🔒 Replay mode" badge with the entry
+count and export date so judges can see at a glance that no API calls
+are being made.
+
 ---
 
 ## Repository layout
