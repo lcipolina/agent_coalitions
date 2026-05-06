@@ -1,6 +1,7 @@
 # Mirror of environment.yml's pip section for non-conda users.
 # Source of truth is environment.yml (per MVP_DESIGN.md §9.1 #3).
 pymongo[srv]==4.*
+dnspython>=2.6
 openai==1.*
 python-dotenv==1.*
 streamlit==1.*
