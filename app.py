@@ -476,13 +476,17 @@ if metrics:
     cost = metrics.get("estimated_cost_eur")
     c4.metric("Cost (EUR)", f"{cost:,.0f}" if isinstance(cost, (int, float)) else "—")
 
+# NOTE: "Concept render" tab is hidden for now (we will re-enable it later).
+# Keep the body block below intact so it can be brought back by re-adding
+# `tab_concept` to this tuple and `"\U0001f5bc\ufe0f Concept render"` to
+# the labels list.
 (
-    tab_method, tab_dag, tab_coal, tab_bb, tab_val, tab_render, tab_concept,
+    tab_method, tab_dag, tab_coal, tab_bb, tab_val, tab_render,
     tab_report, tab_reput, tab_workflow, tab_mongo,
 ) = st.tabs([
     "\U0001f4d6 Methodology",
     "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Agent comms", "\u2705 Validation",
-    "\U0001f3a8 Rendering", "\U0001f5bc\ufe0f Concept render",
+    "\U0001f3a8 Rendering",
     "\U0001f4c4 Report", "\U0001f4c8 Reputation",
     "\U0001f578\ufe0f Workflow", "\U0001f343 MongoDB",
 ])
@@ -1068,7 +1072,9 @@ with tab_render:
 
 
 # ----- Concept render (AI hero image) --------------------------------------
-with tab_concept:
+# Tab is currently hidden (see note above where st.tabs is defined). Body
+# is wrapped in `if False:` so the code stays intact for future use.
+if False:  # noqa: SIM108 - intentional gate, see comment above
     from src.pipeline import concept_render as _concept_render
 
     spec = db.design_specs.find_one({"run_id": run_id}, {"_id": 0}) or {}
