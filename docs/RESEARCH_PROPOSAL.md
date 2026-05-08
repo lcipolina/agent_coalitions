@@ -497,13 +497,97 @@ To pre-empt reviewer scope creep:
 
 ## 14. Next concrete actions
 
+### 14.1 Standing actions (parallel, no dependencies)
+
 1. **Apply for skills.sh API key** (email mentioned on their docs page).
 2. **Start GitHub `path:SKILL.md` crawl** in parallel — this works
    without any external API.
 3. **Refactor RESEARCH_PLAN.md** to align Phase A with §5.1 (large
    catalog, not the 50-skill version).
 4. **Apply for OpenAI Researcher Access** and Anthropic for
-   Researchers credits. Both have rolling deadlines.
-5. **Run a *single* WildClawBench task end-to-end** on a cheap model
-   to confirm the harness works on local Docker (Phase B1). This is
-   the next coding action.
+   Researchers credits. Both have rolling deadlines (kept as fallback;
+   see §14.2 for the OSS-first plan that makes these non-blocking).
+5. **Confirm university cluster access** (queue policy, GPU types,
+   storage quota). This is the load-bearing dependency for the full
+   experiment per §11.
+
+### 14.2 Phase B-pilot: 10-task PoC on WildClawBench
+
+The smallest defensible result. Treats the full experiment plan as
+deferred until this works end-to-end.
+
+**Scope (deliberately minimal):**
+
+- 1 benchmark: WildClawBench
+- 10 tasks: ~2 per category × 5 categories (skip Safety Alignment —
+  H3 predicts no lift, not worth pilot budget)
+- 2 strategies: vanilla baseline + coalition picker (the minimum
+  needed to make a delta claim)
+- 1 model: free-tier OpenRouter (e.g. `llama-3.3-70b-instruct:free`)
+- 1 seed
+- Catalog: `C_curated_50` only (defer the retrieval haystack
+  `C_full` to Phase B-full)
+
+**Deliverable:** one bar chart (10 tasks × 2 strategies), traces in
+MongoDB, one paragraph of writeup. Enough for a workshop submission
+or arXiv preprint.
+
+**Workstream-level hour budget** (optimistic / realistic / pessimistic):
+
+| # | Workstream | Opt | Real | Pess |
+|---|---|---:|---:|---:|
+| 1 | WCB harness setup (clone, `prepare.sh`, datasets, env, point at OpenRouter) | 4h | 8h | 16h |
+| 2 | Single WCB task end-to-end with default skills (validation, not yet our method) | 3h | 6h | 12h |
+| 3 | Catalog adapter: 50-skill curated catalog → WCB skill-bundle format | 6h | 12h | 24h |
+| 4 | Wire `pick_coalition()` into WCB's task loop (replace default-bundle hook) | 4h | 8h | 16h |
+| 5 | Logging: every WCB run writes a `runs` doc to MongoDB | 2h | 4h | 8h |
+| 6 | Run the 10-task pilot, both strategies (incl. mid-run debugging, rate-limit retries) | 4h | 10h | 20h |
+| 7 | Results notebook: bar chart, per-category breakdown, paragraph | 2h | 4h | 8h |
+| 8 | Buffer for the unknown unknown | — | 6h | 16h |
+| | **Total** | **25h** | **58h** | **120h** |
+
+**Calendar mapping:**
+
+- ~3 h/day, 5 days/week → realistic ≈ 4 weeks
+- 6 h/day focused blocks → realistic ≈ 1.5–2 weeks
+- Full-time → realistic ≈ 1.5 weeks
+
+**Risk concentration:**
+
+- **Workstream 3** (catalog adapter) dominates the variance. WCB's
+  agent harness has its own assumptions about how skills are
+  described, loaded, and invoked. Mismatches with our format produce
+  mysterious bugs (truncated descriptions, tool-call schema
+  mismatches, missing `requirements.txt` per skill, etc.).
+- **Workstream 6** (pilot run) is rate-limit-bound on free tier.
+  ~1000 LLM calls at 20 req/min ≈ ~50 min pure throughput, but
+  4–10× that with retries and debugging.
+
+**De-risking rule:** if workstream 3 slips past its pessimistic
+budget (24h), do **not** extend the deadline. Instead, simplify the
+adapter — inline skill descriptions as system-prompt text rather
+than plugging into WCB's native skill loader. This sacrifices some
+realism but unblocks the rest of the pipeline.
+
+**Go / no-go criteria for Phase B-full:**
+
+- Pilot Δ (coalition − vanilla) is *positive in mean* across the 10
+  tasks (don't need significance at n=1 seed; just direction).
+- Per-category breakdown shows lift concentrated in expected
+  categories (SR, PF) per H1, H2.
+- MongoDB writes are clean and re-runnable.
+
+If those three hold, scale to Phase B-full on the university
+cluster. If the mean Δ is zero or negative, **stop and diagnose**
+before committing cluster time — likely the catalog adapter
+(workstream 3) is dropping signal.
+
+### 14.3 What's deferred (NOT in the PoC)
+
+- vLLM / cluster setup (Phase B-full)
+- The retrieval haystack `C_full` (~5–10k skills)
+- All 8 ablations from §6
+- GAIA secondary benchmark
+- Statistical significance (n=1 seed for PoC; multi-seed in B-full)
+- Frontier API model comparison
+- Paper writeup beyond the one paragraph
