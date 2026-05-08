@@ -477,14 +477,210 @@ if metrics:
     c4.metric("Cost (EUR)", f"{cost:,.0f}" if isinstance(cost, (int, float)) else "—")
 
 (
-    tab_dag, tab_coal, tab_bb, tab_val, tab_render, tab_concept,
+    tab_method, tab_dag, tab_coal, tab_bb, tab_val, tab_render, tab_concept,
     tab_report, tab_reput, tab_workflow, tab_mongo,
 ) = st.tabs([
+    "\U0001f4d6 Methodology",
     "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Agent comms", "\u2705 Validation",
     "\U0001f3a8 Rendering", "\U0001f5bc\ufe0f Concept render",
     "\U0001f4c4 Report", "\U0001f4c8 Reputation",
     "\U0001f578\ufe0f Workflow", "\U0001f343 MongoDB",
 ])
+
+
+# ----- Methodology (bird's-eye view) ----------------------------------------
+with tab_method:
+    st.markdown("#### \U0001f52e  How Cadre works")
+    st.caption(
+        "A bird's-eye view of the methodology. The diagram is the same "
+        "for every run \u2014 it's the *story*, not the data. For per-run "
+        "evidence, see the other tabs."
+    )
+
+    _method_dot = """
+digraph Methodology {
+  rankdir=LR;
+  bgcolor="white";
+  pad=0.4;
+  nodesep=0.35;
+  ranksep=0.7;
+  fontname="Helvetica";
+  compound=true;
+
+  node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11
+        margin="0.14,0.08"];
+  edge [color="#4a6fa5" fontsize=9 fontname="Helvetica"];
+
+  // ===== Column 1: Input & decomposition =====
+  subgraph cluster_in {
+    label="1. Split the work";
+    labeljust="l";
+    style="rounded,filled";
+    fillcolor="#fffbe6";
+    color="#b58900";
+    fontname="Helvetica-Bold";
+    fontsize=12;
+
+    user   [label="\U0001f464  User prompt", shape=circle fillcolor="#fff3cd" color="#b58900"];
+    orch   [label="\U0001f9e0  Orchestrator (LLM)\\nsplits the work,\\ninteracts with marshals",
+            fillcolor="#eaf3ff" color="#4a6fa5"];
+    t1     [label="T1" fillcolor="#e6f0ff" color="#4a6fa5"];
+    t2     [label="T2" fillcolor="#fde6f0" color="#a64a7a"];
+    t3     [label="T3" fillcolor="#e6f7e6" color="#2f7a2f"];
+
+    user -> orch;
+    orch -> t1;
+    orch -> t2;
+    orch -> t3;
+  }
+
+  // ===== Column 2: Marketplace =====
+  subgraph cluster_mkt {
+    label="2. Hire specialists from the marketplace";
+    labeljust="l";
+    style="rounded,filled";
+    fillcolor="#f0fff0";
+    color="#2f7a2f";
+    fontname="Helvetica-Bold";
+    fontsize=12;
+
+    market [label="\U0001f343  100,000 skills (skills.sh)\\nvector-indexed by capability",
+            shape=cylinder fillcolor="#d6f0d6" color="#2f7a2f" fontsize=12];
+    find   [label="\U0001f50d  Find candidates\\n(by meaning)" fillcolor="#eaf7ea" color="#2f7a2f"];
+    filt   [label="\u2702\ufe0f  Filter by fit\\n(score \u2265 threshold)" fillcolor="#eaf7ea" color="#2f7a2f"];
+    pick   [label="\U0001f9e9  Pick the smallest team\\nthat covers everything" fillcolor="#eaf7ea" color="#2f7a2f"];
+
+    market -> find [style=invis];
+    find -> filt -> pick;
+  }
+
+  // ===== Column 3: Three teams (the hierarchy) =====
+  subgraph cluster_team1 {
+    label="";
+    style="rounded,filled";
+    fillcolor="#f4f8ff";
+    color="#4a6fa5";
+
+    m1   [label="\U0001f9ed  Marshal T1\\n\u201cstructural\u201d", fillcolor="#dbe8ff" color="#4a6fa5" fontname="Helvetica-Bold"];
+    a1a  [label="\U0001f916\\nload-calc" fillcolor="#ffffff" color="#4a6fa5" fontsize=10];
+    a1b  [label="\U0001f916\\nFEA" fillcolor="#ffffff" color="#4a6fa5" fontsize=10];
+    a1c  [label="\U0001f916\\nCAD" fillcolor="#ffffff" color="#4a6fa5" fontsize=10];
+
+    m1 -> a1a; m1 -> a1b; m1 -> a1c;
+    a1a -> a1b [dir=both color="#9ab4d8" label="\U0001f4ac" fontsize=8];
+    a1b -> a1c [dir=both color="#9ab4d8" label="\U0001f4ac" fontsize=8];
+  }
+
+  subgraph cluster_team2 {
+    label="";
+    style="rounded,filled";
+    fillcolor="#fff4f8";
+    color="#a64a7a";
+
+    m2   [label="\U0001f9ed  Marshal T2\\n\u201cdesign\u201d", fillcolor="#ffd9e8" color="#a64a7a" fontname="Helvetica-Bold"];
+    a2a  [label="\U0001f916\\nform" fillcolor="#ffffff" color="#a64a7a" fontsize=10];
+    a2b  [label="\U0001f916\\nmaterial" fillcolor="#ffffff" color="#a64a7a" fontsize=10];
+    a2c  [label="\U0001f916\\ncolor" fillcolor="#ffffff" color="#a64a7a" fontsize=10];
+
+    m2 -> a2a; m2 -> a2b; m2 -> a2c;
+    a2a -> a2b [dir=both color="#d8a0bc" label="\U0001f4ac" fontsize=8];
+    a2b -> a2c [dir=both color="#d8a0bc" label="\U0001f4ac" fontsize=8];
+  }
+
+  subgraph cluster_team3 {
+    label="";
+    style="rounded,filled";
+    fillcolor="#f4fff4";
+    color="#2f7a2f";
+
+    m3   [label="\U0001f9ed  Marshal T3\\n\u201ccost\u201d", fillcolor="#cfe9cf" color="#2f7a2f" fontname="Helvetica-Bold"];
+    a3a  [label="\U0001f916\\nBOM" fillcolor="#ffffff" color="#2f7a2f" fontsize=10];
+    a3b  [label="\U0001f916\\nrisk" fillcolor="#ffffff" color="#2f7a2f" fontsize=10];
+    a3c  [label="\U0001f916\\nplan" fillcolor="#ffffff" color="#2f7a2f" fontsize=10];
+
+    m3 -> a3a; m3 -> a3b; m3 -> a3c;
+    a3a -> a3b [dir=both color="#9ad89a" label="\U0001f4ac" fontsize=8];
+    a3b -> a3c [dir=both color="#9ad89a" label="\U0001f4ac" fontsize=8];
+  }
+
+  // ===== Sidecars =====
+  subgraph cluster_side {
+    label="";
+    style="invis";
+
+    side_db  [label="\U0001f343  MongoDB\\ncatalog \u00b7 vector index\\nmessage bus \u00b7 audit log",
+              fillcolor="#fff8e6" color="#b58900" fontsize=10];
+    side_rep [label="\U0001f4c8  Reputation memory\\ncarries skill performance\\nacross runs",
+              fillcolor="#fff8e6" color="#b58900" fontsize=10];
+
+    side_db -> side_rep [style=invis];
+  }
+
+  // ===== Cross-column wiring =====
+  // Subtasks feed into the marketplace
+  t1 -> find [label="needed\\nskills" lhead=cluster_mkt];
+
+  // Marketplace output -> each team's marshal
+  pick -> m1 [label="team T1" ltail=cluster_mkt];
+  pick -> m2 [label="team T2" ltail=cluster_mkt];
+  pick -> m3 [label="team T3" ltail=cluster_mkt];
+
+  // Output node
+  brief [label="\U0001f4c4  Design brief\\n(report + 3D + cost)",
+         fillcolor="#fff3cd" color="#b58900"];
+  a1c -> brief [style=dashed];
+  a2c -> brief [style=dashed];
+  a3c -> brief [style=dashed];
+}
+""".strip()
+
+    st.graphviz_chart(_method_dot, use_container_width=True)
+
+    st.markdown("---")
+    st.markdown("#### How it works \u2014 in four steps")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        with st.container(border=True):
+            st.markdown("##### 1\ufe0f\u20e3  Split the work")
+            st.markdown(
+                "The **orchestrator** reads the prompt and breaks it into "
+                "smaller subtasks, each with a list of skills it'll need."
+            )
+    with c2:
+        with st.container(border=True):
+            st.markdown("##### 2\ufe0f\u20e3  Hire specialists")
+            st.markdown(
+                "For each subtask, search a **100,000-skill marketplace** "
+                "(skills.sh) and pick the smallest team whose skills cover "
+                "everything the subtask needs."
+            )
+    with c3:
+        with st.container(border=True):
+            st.markdown("##### 3\ufe0f\u20e3  Each team has a *raison d'\u00eatre*")
+            st.markdown(
+                "A **marshal** leads each team \u2014 one for structure, "
+                "one for design, one for cost. Inside the team, agents "
+                "talk to each other; teams don't talk across."
+            )
+    with c4:
+        with st.container(border=True):
+            st.markdown("##### 4\ufe0f\u20e3  Learn who pulled their weight")
+            st.markdown(
+                "After the run, **Shapley values** measure each agent's "
+                "actual contribution. Good performers gain reputation; "
+                "future runs prefer them."
+            )
+
+    st.markdown("---")
+    st.info(
+        "**The point.** Most agent frameworks try to build one giant "
+        "agent that does everything. Cadre treats every task like a "
+        "project: split it, hire a small team of specialists from a "
+        "100k-skill marketplace, let each team focus on its own piece, "
+        "then remember who did well for next time.",
+        icon="\U0001f4a1",
+    )
 
 
 # ----- DAG ------------------------------------------------------------------

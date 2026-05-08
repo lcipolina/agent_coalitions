@@ -19,3 +19,4 @@ pitch.md
 .vscode/
 docs/BENCHMARKS.md
 scripts/export_llm_cache.py
+docs/Feedback.md

@@ -1,10 +1,4 @@
-# TODO — *(archived 2026-05-06; hackathon-era)*
-
-> **Frozen snapshot.** The hackathon is over. Active work is now tracked
-> in [RESEARCH_PLAN.md](RESEARCH_PLAN.md), aimed at a paper submission
-> using [WildClawBench](https://internlm.github.io/WildClawBench/) as
-> the target benchmark. This file is preserved only to record what was
-> planned and resolved during the 1-day MVP.
+# TODO —
 
 Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amendments 2026-05-01 for the resolutions that produced these.
 
@@ -20,7 +14,7 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [x] G8 Streamlit UI — live progress + 8 tabs + bridge elevation viz
 - [x] G9 replay (zero LLM calls asserted by orchestrator)
 - [x] G10 reputation persists across runs (`agents.reputation` accumulates)
-- [ ] G11 demo script (≤90 s)
+
 
 ## Backlog
 
