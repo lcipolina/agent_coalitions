@@ -754,7 +754,31 @@ def _generic_primitives(spec: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _spec_looks_like_bridge(spec: dict[str, Any]) -> bool:
+def _domain_from_prompt(prompt: str) -> str | None:
+    """Infer a coarse design domain from the user prompt.
+
+    The Specifier LLM occasionally hallucinates bridge-shaped fields
+    (``span_layout``, ``deck_width_m``, ...) for non-bridge prompts
+    because the synthesizer template is bridge-biased. The prompt is
+    the most reliable signal for "what did the user actually ask for".
+    """
+    p = (prompt or "").lower()
+    if "rollercoaster" in p or "roller coaster" in p or "coaster" in p:
+        return "rollercoaster"
+    if "airplane" in p or "aeroplane" in p or "aircraft" in p or "plane" in p:
+        return "airplane"
+    if "bridge" in p:
+        return "bridge"
+    return None
+
+
+def _spec_looks_like_bridge(spec: dict[str, Any], prompt: str | None = None) -> bool:
+    # Prompt is authoritative when it mentions a known non-bridge domain.
+    inferred = _domain_from_prompt(prompt or "")
+    if inferred and inferred != "bridge":
+        return False
+    if inferred == "bridge":
+        return True
     keys = {"span_layout", "deck_width_m", "bridge_type",
             "total_length_m", "design_live_load_kN_per_m"}
     has_keys = sum(1 for k in keys if spec.get(k))
@@ -762,10 +786,15 @@ def _spec_looks_like_bridge(spec: dict[str, Any]) -> bool:
     return domain == "bridge" or has_keys >= 3
 
 
-def _deterministic_primitives(spec: dict[str, Any]) -> dict[str, Any]:
+def _deterministic_primitives(spec: dict[str, Any], prompt: str | None = None) -> dict[str, Any]:
     """Dispatch deterministic geometry on whether the spec is a bridge."""
-    if _spec_looks_like_bridge(spec):
+    if _spec_looks_like_bridge(spec, prompt):
         return _bridge_primitives(spec)
+    # Force-set domain on the spec copy so _generic_primitives picks the
+    # right recipe even if the Specifier LLM hallucinated bridge fields.
+    inferred = _domain_from_prompt(prompt or "")
+    if inferred and inferred != "bridge" and (spec.get("domain") or "").lower() != inferred:
+        spec = {**spec, "domain": inferred}
     return _generic_primitives(spec)
 
 
@@ -839,12 +868,18 @@ def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
                       deterministic and log a warning.
     """
     source: str
-    is_bridge = _spec_looks_like_bridge(spec)
+    # Prompt is the most reliable signal of "what did the user ask for".
+    # The Specifier LLM sometimes hallucinates bridge fields for
+    # non-bridge prompts; using the prompt as a tiebreaker prevents the
+    # visualiser from drawing a bridge for a rollercoaster prompt.
+    run_doc = get_db().runs.find_one({"run_id": run_id}, {"prompt": 1}) or {}
+    user_prompt = run_doc.get("prompt", "")
+    is_bridge = _spec_looks_like_bridge(spec, user_prompt)
     if settings.use_mock_llm or not is_bridge:
         # Deterministic recipes produce far more legible non-bridge
         # geometry (curved rollercoaster rails, stacked floors, etc.)
         # than free-form LLM box-piles. Only let the LLM draw bridges.
-        geometry = _deterministic_primitives(spec)
+        geometry = _deterministic_primitives(spec, user_prompt)
         source = "deterministic"
     else:
         try:
@@ -864,14 +899,14 @@ def build_geometry(run_id: str, spec: dict[str, Any]) -> dict[str, Any]:
                     "(%d primitives, %d lines); using deterministic fallback",
                     n_prims, n_lines,
                 )
-                geometry = _deterministic_primitives(spec)
+                geometry = _deterministic_primitives(spec, user_prompt)
                 source = "deterministic_fallback_sparse"
             else:
                 source = "llm"
         except Exception as exc:  # noqa: BLE001 - any LLM failure is recoverable
             log.warning("visualiser LLM failed (%s); using deterministic fallback",
                         exc)
-            geometry = _deterministic_primitives(spec)
+            geometry = _deterministic_primitives(spec, user_prompt)
             source = "deterministic_fallback"
     geometry["source"] = source
 

@@ -538,9 +538,9 @@ digraph Methodology {
     orch -> t3;
   }
 
-  // ===== Column 2: Marketplace =====
+  // ===== Column 2: Skills DB (semantic search + Shapley) =====
   subgraph cluster_mkt {
-    label="2. Hire specialists from the marketplace";
+    label="2. Semantic search over the skills DB";
     labeljust="l";
     style="rounded,filled";
     fillcolor="#f0fff0";
@@ -550,8 +550,8 @@ digraph Methodology {
 
     market [label="\U0001f343  100,000 skills (skills.sh)\\nvector-indexed by capability",
             shape=cylinder fillcolor="#d6f0d6" color="#2f7a2f" fontsize=12];
-    find   [label="\U0001f50d  Find candidates\\n(by meaning)" fillcolor="#eaf7ea" color="#2f7a2f"];
-    filt   [label="\u2702\ufe0f  Filter by fit\\n(score \u2265 threshold)" fillcolor="#eaf7ea" color="#2f7a2f"];
+    find   [label="\U0001f50d  Find candidates\\n(RAG over skills DB)" fillcolor="#eaf7ea" color="#2f7a2f"];
+    filt   [label="\u2696\ufe0f  Score by marginal fit\\n(Shapley contribution)" fillcolor="#eaf7ea" color="#2f7a2f"];
     pick   [label="\U0001f9e9  Pick the smallest team\\nthat covers everything" fillcolor="#eaf7ea" color="#2f7a2f"];
 
     market -> find [style=invis];
@@ -653,11 +653,12 @@ digraph Methodology {
             )
     with c2:
         with st.container(border=True):
-            st.markdown("##### 2\ufe0f\u20e3  Hire specialists")
+            st.markdown("##### 2\ufe0f\u20e3  Search the skills DB")
             st.markdown(
-                "For each subtask, search a **100,000-skill marketplace** "
-                "(skills.sh) and pick the smallest team whose skills cover "
-                "everything the subtask needs."
+                "For each subtask, do **RAG over a 100,000-skill database** "
+                "(skills.sh) to retrieve candidate agents, then use **Shapley "
+                "values** to pick the smallest team whose skills actually "
+                "cover what the subtask needs."
             )
     with c3:
         with st.container(border=True):

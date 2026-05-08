@@ -158,6 +158,42 @@ def _agent(prompt: str, agent_id: str = "agent_xxx", subtask_id: str = "T?", **_
 
 
 def _synthesizer(prompt: str, **_: Any) -> str:
+    p = (prompt or "").lower()
+    if "rollercoaster" in p or "roller coaster" in p or "coaster" in p:
+        return json.dumps({
+            "design_type": "looping_steel_rollercoaster",
+            "domain": "rollercoaster",
+            "primary_material": "structural_steel",
+            "secondary_material": "reinforced_concrete",
+            "aesthetic_style": "modern_minimal",
+            "dimensions": {"length_m": 600, "width_m": 12, "height_m": 50},
+            "characteristics": {
+                "track_length_m": 600,
+                "max_height_m": 50,
+                "loops": 2,
+                "max_speed_kmh": 90,
+                "capacity_per_hour": 800,
+            },
+            "validation_status": "pending",
+        })
+    if "airplane" in p or "aeroplane" in p or "aircraft" in p or "plane" in p:
+        return json.dumps({
+            "design_type": "twin_engine_medium_haul_aircraft",
+            "domain": "airplane",
+            "primary_material": "aluminium_alloy",
+            "secondary_material": "carbon_fibre_composite",
+            "aesthetic_style": "aerodynamic_minimal",
+            "dimensions": {"length_m": 38.0, "width_m": 36.0, "height_m": 12.0},
+            "characteristics": {
+                "wingspan_m": 36.0,
+                "fuselage_length_m": 38.0,
+                "passenger_capacity": 200,
+                "range_km": 6500,
+                "cruise_mach": 0.78,
+            },
+            "validation_status": "pending",
+        })
+    # Default: bridge (the demo's canonical example).
     return json.dumps({
         "design_type": "multi_span_cable_stayed_bridge",
         "domain": "bridge",
