@@ -1,9 +1,13 @@
-# To run the app
+# To run the app LOCALLY
 conda run -n coalitions --no-capture-output streamlit run app.py
 
 # To check the connection to mongodb
 conda run -n coalitions --no-capture-output python scripts/check_mongo.py
 
-# Website
-https://share.streamlit.io/
-https://agentcoalitions.streamlit.app/
+# To run on Streamlit Cloud
+# 1) Open https://share.streamlit.io/ and attach repo → file app.py
+# 2) Manage app → Settings → Secrets (top-level, quoted):
+#    MONGODB_URI = "mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority"
+#    MONGODB_DB  = "agent_coalitions"
+#    USE_MOCK_LLM = "true"
+# 3) Click Rerun. Live app: https://agentcoalitions.streamlit.app/

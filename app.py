@@ -317,6 +317,29 @@ run_clicked = run_col.button("🚀  Run pipeline", type="primary",
 # ----------------------------------------------------------------------------
 # Live run view
 # ----------------------------------------------------------------------------
+######################################################################
+# Live run view: event-driven UI updater
+#
+# The pipeline backend emits a stream of events during a run. We attach
+# a listener that updates Streamlit widgets (progress bar, status lines,
+# per-subtask boxes) as those events arrive. This keeps the UI snappy
+# without polling Mongo.
+#
+# Event kinds we handle (info payload varies per kind):
+# - "pipeline_start": {prompt}
+# - "stage_start": {stage}
+# - "decomposed": {n_subtasks, subtasks: [{id, title, deps}]}
+# - "subtask_start": {subtask_id, title, idx, total}
+# - "candidates_found": {n}
+# - "coalition_formed": {skills:[...], agents:[...], rationale}
+# - "round_posted": {...}  (ticker only)
+# - "subtask_end": {subtask_id}
+# - "stage_end": {stage}
+# - "pipeline_end": {summary:{run_id}}
+#
+# The listener keeps a small bit of transient state (counts/timestamps)
+# purely for progress display; the source of truth is still Mongo.
+######################################################################
 def _live_listener_factory(
     progress_bar,
     stage_status,
@@ -324,7 +347,15 @@ def _live_listener_factory(
     skill_box,
     log_area,
 ):
-    """Return a callback that updates Streamlit widgets in place."""
+    """Return a callback that updates Streamlit widgets in place.
+
+    Parameters
+    - progress_bar: st.progress handle for overall stage completion
+    - stage_status: st.empty handle for the current stage status line
+    - subtask_box:  st.empty handle for the active subtask header
+    - skill_box:    st.empty handle for skills/agents details per subtask
+    - log_area:     st.empty handle for the task-graph summary
+    """
     state: dict[str, Any] = {
         "stages_done": 0,
         "n_subtasks": 0,
@@ -337,24 +368,30 @@ def _live_listener_factory(
         st.session_state.events.append((kind, info))
 
         if kind == "pipeline_start":
+            # New run: show which prompt is being executed
             stage_status.info(f"Starting run for: *{info.get('prompt')}*")
 
         elif kind == "stage_start":
+            # A high-level pipeline stage has begun (decompose/execute/...)
             stage = info["stage"]
             state["stage_starts"][stage] = time.time()
             label = next((lbl for s, lbl in STAGES if s == stage), stage)
             stage_status.info(f"⏳  {label} …")
 
         elif kind == "decomposed":
+            # The decomposer produced the subtask graph; render a summary list
             state["n_subtasks"] = info["n_subtasks"]
             lines = "\n".join(
                 f"- **{s['id']}** — {s['title']}"
                 + (f"  ←  {', '.join(s['deps'])}" if s["deps"] else "")
                 for s in info["subtasks"]
             )
-            log_area.markdown(f"**DAG ({info['n_subtasks']} subtasks):**\n{lines}")
+            log_area.markdown(
+                f"**Task graph ({info['n_subtasks']} subtasks):**\n{lines}"
+            )
 
         elif kind == "subtask_start":
+            # One subtask (T1/T2/...) entered its execution loop
             subtask_box.markdown(
                 f"### 🎯  {info['subtask_id']} — {info['title']}  "
                 f"`({info['idx']}/{info['total']})`"
@@ -362,11 +399,13 @@ def _live_listener_factory(
             skill_box.empty()
 
         elif kind == "candidates_found":
+            # Vector search returned N candidate skills for this subtask
             skill_box.caption(
                 f"🔎  {info['n']} candidate skills retrieved from vector search"
             )
 
         elif kind == "coalition_formed":
+            # The coalition was selected and mapped to concrete agents
             skills_md = "\n".join(
                 f"  - `{s['skill_id']}` \u2014 *{s['name']}*  "
                 f"(\u03c6 {s.get('shapley', s.get('solo', 0.0)):.2f})"
@@ -393,24 +432,27 @@ def _live_listener_factory(
             )
 
         elif kind == "round_posted":
-            # Lightweight ticker append.
+            # A message round was appended to the council log (ticker-only)
             pass
 
         elif kind == "subtask_end":
+            # Current subtask finished its council + synthesis loop
             state["subtasks_done"] += 1
 
         elif kind == "stage_end":
+            # One top-level stage completed; bump the overall progress bar
             state["stages_done"] += 1
             frac = state["stages_done"] / n_stages
             progress_bar.progress(min(frac, 1.0))
 
         elif kind == "pipeline_end":
+            # Run is complete; clear transient boxes and show the run_id
             progress_bar.progress(1.0)
             stage_status.success(
                 f"✅  Pipeline complete — `{info['summary']['run_id']}`"
             )
             # Clear the live snapshots so the page doesn't keep showing the
-            # last subtask's team / DAG below the success banner — the full
+            # last subtask's team / task graph below the success banner — the full
             # results are in the tabs below.
             subtask_box.empty()
             skill_box.empty()
@@ -485,7 +527,7 @@ if metrics:
     tab_report, tab_reput, tab_workflow, tab_mongo,
 ) = st.tabs([
     "\U0001f4d6 Methodology",
-    "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Council", "\u2705 Validation",
+    "\U0001f333 Task graph", "\U0001f465 Teams", "\U0001f4ac Council", "\u2705 Validation",
     "\U0001f3a8 Rendering",
     "\U0001f4c4 Report", "\U0001f4c8 Reputation",
     "\U0001f578\ufe0f Workflow", "\U0001f343 MongoDB",
@@ -688,7 +730,7 @@ digraph Methodology {
     )
 
 
-# ----- DAG ------------------------------------------------------------------
+# ----- Task graph -----------------------------------------------------------
 with tab_dag:
     subtasks = list(
         db.subtasks.find({"run_id": run_id}, {"_id": 0}).sort("topo_index", 1)
@@ -696,7 +738,7 @@ with tab_dag:
     if not subtasks:
         st.info("No subtasks yet.")
     else:
-        st.markdown("#### Subtask DAG (data-flow)")
+        st.markdown("#### Subtask graph (data flow)")
         st.caption(
             "Topological view of subtasks emitted by the decomposer. "
             "Edges are *upstream-output* dependencies, **not** authority."
@@ -717,7 +759,7 @@ with tab_dag:
         # Hierarchical view: the orchestrator (the Python pipeline) spawns
         # one marshal per subtask, and each marshal coordinates the agents
         # the set-cover step assigned to that subtask. This is the
-        # *authority* graph, complementing the data-flow DAG above.
+        # *authority* graph, complementing the data-flow task graph above.
         st.markdown("#### Org chart (orchestrator → marshals → agents)")
         st.caption(
             "Authority view. The orchestrator spawns one marshal per "
@@ -911,11 +953,11 @@ with tab_coal:
 # ----- Council (multi-agent deliberation) -----------------------------------
 with tab_bb:
     st.caption(
-        "**Council (multi-agent deliberation).** This shows the agents' "
-        "communication while solving their subtask. The marshal (\U0001f9ed) "
-        "starts off the conversation and coordinates each round; the agents "
-        "(\U0001f916) contribute their domain expertise; when the team is "
-        "done the marshal summarises the result back to the orchestrator."
+        "**Agentic Council.** This shows the agents' communication while "
+        "solving their subtask. The marshal (\U0001f9ed) starts off the "
+        "conversation and coordinates each round; the agents (\U0001f916) "
+        "contribute their domain expertise; when the team is done the marshal "
+        "summarises the result back to the orchestrator."
     )
     msgs = list(
         db.coalition_messages.find({"run_id": run_id}, {"_id": 0})
@@ -1408,7 +1450,8 @@ digraph MongoDB {
         "1. **User \u2192 Design prompt.**  A free-text brief like *\"design a "
         "2 km bridge for 50 cars/h, modern aesthetic\"* enters the system.\n"
         "2. **Decomposer (LLM).**  `gpt-4o-mini` rewrites the prompt as a "
-        "DAG of sub-tasks, each annotated with the *capabilities* it needs "
+        "Task graph (directed acyclic graph) of sub-tasks, each annotated "
+        "with the *capabilities* it needs "
         "(e.g. *structural-analysis*, *deck-design*, *cost-estimation*).\n"
         "3. **OpenAI embeddings (1536-d).**  Each sub-task's capability "
         "string is vectorised with `text-embedding-3-small`. This is the "
