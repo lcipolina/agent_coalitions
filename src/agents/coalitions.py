@@ -32,6 +32,19 @@ MAX_COALITION = 3
 
 @dataclass
 class CandidateSkill:
+    """One candidate skill considered for coalition formation.
+
+    Attributes:
+        skill_id: Stable identifier for the skill in the catalog.
+        name: Human-readable skill name.
+        coverage: Cosine similarity to the subtask query, clipped to [0, 1].
+        prior_reputation: Prior reputation score carried across runs.
+        weekly_installs: Proxy for adoption/popularity of the skill.
+        embedding: Vector embedding for pairwise complementarity.
+        solo: Precomputed solo value ``v({s})`` used in coalition scoring.
+        skills_contributed: Labels of concrete skills this item supplies.
+    """
+
     skill_id: str
     name: str
     coverage: float                  # cosine(e_skill, e_q) clipped [0,1]
@@ -43,6 +56,15 @@ class CandidateSkill:
 
 
 def _solo_value(c: CandidateSkill, gamma_norm: float) -> float:
+    """Compute the solo value for a single candidate skill.
+
+    Args:
+        c: The candidate skill.
+        gamma_norm: Normalisation term for the log-installs component.
+
+    Returns:
+        float: The solo value ``α·coverage + β·prior + γ·log(1+installs)/norm``.
+    """
     return (
         ALPHA * c.coverage
         + BETA * c.prior_reputation
@@ -51,6 +73,7 @@ def _solo_value(c: CandidateSkill, gamma_norm: float) -> float:
 
 
 def _cos(a: np.ndarray, b: np.ndarray) -> float:
+    """Cosine similarity between two vectors (safe on zero vectors)."""
     na, nb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
     if na == 0 or nb == 0:
         return 0.0

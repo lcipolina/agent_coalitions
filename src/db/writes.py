@@ -15,6 +15,11 @@ from src.db.client import get_db
 
 
 def _now() -> datetime:
+    """Return the current UTC timestamp.
+
+    Returns:
+        datetime: A timezone-aware UTC datetime.
+    """
     return datetime.now(timezone.utc)
 
 
@@ -25,7 +30,17 @@ def log_event(
     *,
     db: Database | None = None,
 ) -> None:
-    """Insert a single ``events`` row tagged with ``run_id`` and ``kind``."""
+    """Insert an event row tagged with a run id and kind.
+
+    Args:
+        run_id: The run identifier this event is associated with.
+        kind: Short event kind label (e.g., ``"stage_start"``).
+        payload: Optional event payload stored verbatim.
+        db: Optional explicit database handle (defaults to app database).
+
+    Returns:
+        None
+    """
     db = db if db is not None else get_db()
     db.events.insert_one(
         {"run_id": run_id, "ts": _now(), "kind": kind, "payload": payload or {}}
@@ -40,9 +55,20 @@ def insert_with_event(
     event_payload: dict[str, Any] | None = None,
     db: Database | None = None,
 ) -> Any:
-    """Insert *doc* into *collection* and emit a paired events row.
+    """Insert a document and emit a paired events row.
 
-    *doc* must contain a ``run_id`` field.
+    Args:
+        collection: Target collection name for the insert.
+        doc: Document to insert (must include ``run_id``).
+        event_kind: Kind label for the paired event.
+        event_payload: Optional payload for the event row.
+        db: Optional explicit database handle.
+
+    Returns:
+        Any: The inserted document id.
+
+    Raises:
+        ValueError: If ``doc`` does not contain ``run_id``.
     """
     db = db if db is not None else get_db()
     if "run_id" not in doc:

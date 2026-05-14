@@ -28,7 +28,19 @@ import streamlit as st  # noqa: E402
 # Locally, st.secrets is empty when no .streamlit/secrets.toml exists, so
 # this loop is a no-op and the .env file is used as before.
 def _hydrate_env_from_st_secrets() -> None:
-    """Flatten st.secrets (incl. one level of [section] nesting) into os.environ."""
+    """Load Streamlit secrets into environment variables.
+
+    Flattens `st.secrets` into `os.environ` so `pydantic-settings` can
+    read them as if they were `.env` entries. One level of section nesting
+    is supported (e.g. a top-level `[env]` or `[secrets]` table).
+
+    Returns:
+        None: This function mutates `os.environ` in place.
+
+    Raises:
+        StreamlitSecretNotFoundError: If the secrets backend is unreachable
+            (caught and ignored here; function becomes a no-op locally).
+    """
     try:
         items = list(st.secrets.items())
     except (FileNotFoundError, st.errors.StreamlitSecretNotFoundError):
@@ -88,10 +100,17 @@ except Exception as _exc:  # pragma: no cover — import-time fallback
 
 
 def run_pipeline(prompt: str):
-    """Dispatch to the backend selected by ``settings.use_langgraph``.
+    """Run the pipeline using the selected backend.
 
-    Reading the flag at call time (not import time) lets the sidebar
-    toggle flip backends without restarting Streamlit.
+    Dispatches to the LangGraph backend when enabled, otherwise uses the
+    plain function pipeline. The flag is read at call time so the sidebar
+    toggle can switch backends without restarting Streamlit.
+
+    Args:
+        prompt: The user design prompt to process end-to-end.
+
+    Returns:
+        dict: A summary of the run produced by the orchestrator.
     """
     if settings.use_langgraph and LANGGRAPH_AVAILABLE:
         return _run_pipeline_lg(prompt)  # type: ignore[misc]
@@ -156,7 +175,15 @@ STAGES = [
 
 @st.cache_data(show_spinner=False)
 def _agent_display_map(_db_name: str = settings.mongodb_db) -> dict[str, str]:
-    """Return ``{agent_id: human_label}`` for every agent in the catalog."""
+    """Build a mapping from agent ids to short human labels.
+
+    Args:
+        _db_name: MongoDB database name (used for Streamlit cache key only).
+
+    Returns:
+        dict[str, str]: A mapping like ``{"agent_007": "#007", ...}`` with
+        ``"Marshal"`` for the coordinator id.
+    """
     out: dict[str, str] = {}
     for ag in get_db().agents.find(
         {}, {"_id": 0, "agent_id": 1},
@@ -171,12 +198,28 @@ def _agent_display_map(_db_name: str = settings.mongodb_db) -> dict[str, str]:
 
 
 def _agent_label(agent_id: str) -> str:
-    """Return the human-friendly label for ``agent_id`` (id itself if unknown)."""
+    """Return a short display label for an agent id.
+
+    Args:
+        agent_id: The persistent agent identifier (e.g. ``"agent_007"``).
+
+    Returns:
+        str: A friendly label (e.g. ``"#007"`` or ``"Marshal"``) or the
+        original id if the agent is unknown.
+    """
     return _agent_display_map().get(agent_id, agent_id)
 
 
 def _team_label(sid: str) -> str:
-    """Return a friendlier label for a subtask id like 'T7' → 'Team 7'."""
+    """Convert a subtask id into a friendly team label.
+
+    Args:
+        sid: The subtask identifier (e.g. ``"T7"``).
+
+    Returns:
+        str: ``"Team 7"`` for ids of the form ``T<digits>``, otherwise the
+        original id.
+    """
     try:
         if sid and sid[0].upper() == "T" and sid[1:].isdigit():
             return f"Team {int(sid[1:])}"
@@ -189,6 +232,14 @@ def _team_label(sid: str) -> str:
 # Session state init
 # ----------------------------------------------------------------------------
 def _init_state() -> None:
+    """Initialise Streamlit session state keys used by the app.
+
+    Creates default entries for the current run id, the running flag, and
+    the transient event log used to render the live-progress ticker.
+
+    Returns:
+        None
+    """
     ss = st.session_state
     ss.setdefault("run_id", None)
     ss.setdefault("running", False)
@@ -357,14 +408,18 @@ def _live_listener_factory(
     skill_box,
     log_area,
 ):
-    """Return a callback that updates Streamlit widgets in place.
+    """Create an event callback that updates Streamlit widgets in place.
 
-    Parameters
-    - progress_bar: st.progress handle for overall stage completion
-    - stage_status: st.empty handle for the current stage status line
-    - subtask_box:  st.empty handle for the active subtask header
-    - skill_box:    st.empty handle for skills/agents details per subtask
-    - log_area:     st.empty handle for the task-graph summary
+    Args:
+        progress_bar: The ``st.progress`` handle for overall stage progress.
+        stage_status: The ``st.empty`` handle for the current stage status.
+        subtask_box: The ``st.empty`` handle for the active subtask header.
+        skill_box: The ``st.empty`` handle for skills/agents details.
+        log_area: The ``st.empty`` handle for the task-graph summary.
+
+    Returns:
+        Callable[[str, dict], None]: A function ``cb(kind, info)`` that the
+        orchestrator uses to stream UI updates during a pipeline run.
     """
     state: dict[str, Any] = {
         "stages_done": 0,
