@@ -80,7 +80,7 @@ if not os.environ.get("MONGODB_URI"):
 
 from src.core.config import settings  # noqa: E402
 from src.db.client import get_db, ping_db  # noqa: E402
-from src.pipeline.orchestrator import run_pipeline as _run_pipeline_fn  # noqa: E402
+from src.pipeline.orchestrator import run_pipeline as _run_pipeline_fn
 
 
 # LangGraph is an optional dependency: if it isn't installed, the toggle

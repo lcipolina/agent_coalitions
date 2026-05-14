@@ -15,6 +15,7 @@ Replay path: if ``replay=True`` we skip stages 2-9 and only re-read the
 existing rows for the given run_id. The G9 invariant
 (``openai_client.call_counter == 0``) is asserted by the caller.
 """
+
 from __future__ import annotations
 
 import logging
@@ -58,14 +59,20 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
     emit("stage_start", {"stage": "decompose"})
     subtasks = decompose(run_id, prompt)
     ordered = topo_order(subtasks)
-    emit("decomposed", {
-        "n_subtasks": len(ordered),
-        "subtasks": [
-            {"id": st["subtask_id"], "title": st["title"],
-             "deps": st.get("depends_on", [])}
-            for st in ordered
-        ],
-    })
+    emit(
+        "decomposed",
+        {
+            "n_subtasks": len(ordered),
+            "subtasks": [
+                {
+                    "id": st["subtask_id"],
+                    "title": st["title"],
+                    "deps": st.get("depends_on", []),
+                }
+                for st in ordered
+            ],
+        },
+    )
     emit("stage_end", {"stage": "decompose"})
 
     # Stage 2.5: derive validation spec from the prompt and persist on runs.
@@ -83,10 +90,15 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
     for idx, st in enumerate(ordered, 1):
         st_doc = {**st, "run_id": run_id}
         upstream = upstream_outputs(run_id, st_doc)
-        emit("subtask_start", {
-            "subtask_id": st["subtask_id"], "title": st["title"],
-            "idx": idx, "total": total,
-        })
+        emit(
+            "subtask_start",
+            {
+                "subtask_id": st["subtask_id"],
+                "title": st["title"],
+                "idx": idx,
+                "total": total,
+            },
+        )
         execute_subtask(run_id, st_doc, upstream, criteria=criteria)
         emit("subtask_end", {"subtask_id": st["subtask_id"]})
     emit("stage_end", {"stage": "execute"})
@@ -139,7 +151,7 @@ def replay(run_id: str) -> dict[str, Any]:
         "cost_estimates": db.cost_estimates.count_documents({"run_id": run_id}),
         "artifacts": db.artifacts.count_documents({"run_id": run_id}),
     }
-    assert openai_client.call_counter() == 0, (
-        f"replay must make 0 LLM calls, got {openai_client.call_counter()}"
-    )
+    assert (
+        openai_client.call_counter() == 0
+    ), f"replay must make 0 LLM calls, got {openai_client.call_counter()}"
     return out
