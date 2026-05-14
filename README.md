@@ -1,218 +1,157 @@
-# Capability-Search-Based Delegation System for Multi-Agent Collaboration
+# 🔮 Cadre
 
-> An MVP for assembling specialist agent teams from a skill marketplace, then having them collaborate end-to-end on a complex brief — all on MongoDB Atlas.
->
-> *Conceptual outputs produced by an experimental multi-agent system. Not certified engineering. Not for production.*
+**A team of specialized agents for tasks too complex for a single agent.**
 
-## What this is
+Cadre turns a high-level design brief into a coordinated project: it splits
+the work, finds the right specialist agents, lets each team deliberate, and
+assembles the result into a proposal with validation, cost, rendering, and a
+report.
 
-A single Python process that takes a prompt for a long and complex tasks, decomposes it into a DAG of subtasks, runs MongoDB Atlas Vector Search + pairwise-complementarity team formation to assign 1–3 agents per subtask, lets each team collaborate on a Mongo-backed message log coordinated by a marshal LLM, and synthesises the result into a structured proposal with visualisations and a deterministic validation card.
 
-**MongoDB Atlas is live.** All thirteen domain collections and the Atlas Vector Search index are real and exercised on every run. The only thing that can be mocked is the LLM layer (chat + embeddings); when mocked, Atlas Vector Search still runs end-to-end — only the query vector changes from an OpenAI embedding to a deterministic SHA-256-seeded pseudo-embedding. Mock mode is the default for the live demo because it finishes a full pipeline run in under five seconds and never depends on network weather.
+## What Cadre Does
 
-For the system design, the rationale behind every interesting choice (skill–agent split, team value formula, communication-forum protocol, validation ordering, reputation weighting), and the full repository layout, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The product contract is in [docs/MVP_DESIGN.md](docs/MVP_DESIGN.md), the cooperative-game-theory background in [docs/GAME_THEORY_PRIMER.md](docs/GAME_THEORY_PRIMER.md), the matching-pipeline walkthrough in [docs/MATCHING_PIPELINE.md](docs/MATCHING_PIPELINE.md), the 5-minute pitch script in [docs/PITCH.md](docs/PITCH.md), and the post-MVP backlog in [docs/TODO.md](docs/TODO.md).
+Cadre is a Python pipeline for multi-agent team formation.
+Instead of asking one large agent to do everything, it builds small teams
+around each subtask:
 
----
+- An orchestrator decomposes the brief into a task graph.
+- A skill search step narrows a large skills marketplace, such as
+  [skills.sh](https://skills.sh/), to the few capabilities relevant to each
+  subtask.
+- A Shapley-style scoring step picks compact teams with complementary skills.
+- A marshal coordinates each team's Council round.
+- The system synthesizes the outputs into a final design package.
 
-## Prerequisites
+This is the central methodological move: when there are thousands of possible
+skills, Cadre does not ask an LLM to read or choose from the whole catalog.
+It first uses semantic retrieval to create a small candidate set, then scores
+which skills add the most marginal value to the team.
 
-- **macOS / Linux / WSL** (only tested on macOS for now).
-- **Conda or Miniconda** installed (`conda --version` should print something).
-- **MongoDB Atlas** cluster (free tier is fine) with **Atlas Search** enabled.
-- **OpenAI API key** (or run in mock mode without one — see below).
-- Git.
+MongoDB is used as the skill catalog, vector search index, Council message log, run audit trail, replay store, and reputation memory.
 
----
+## Method At A Glance
 
-## Setting up the environment (one-time, per machine)
+```mermaid
+flowchart LR
+    prompt([User brief]) --> split[Orchestrator<br/>split into subtasks]
+    split --> tasks[Task graph<br/>T1 · T2 · T3]
 
-The conda env is the source of truth. Recreate it on a clean machine with:
+    tasks --> catalog[(Thousands of skills<br/>for example skills.sh)]
+    catalog --> search[Semantic skill retrieval<br/>small candidate set]
+    search --> score[Score complementarity<br/>Shapley-style marginal fit]
+    score --> team[Pick compact specialist teams]
+
+    team --> council[Council rounds<br/>marshal kickoff → agent contributions → marshal summary]
+    council --> synth[Synthesize design]
+    synth --> outputs[Proposal<br/>validation · cost · 3D · report]
+
+    council -. persisted .-> memory[(Run memory)]
+    outputs -. feedback .-> reputation[(Reputation)]
+    reputation -. informs .-> score
+```
+
+The important idea is simple: **split the project, staff each piece with a
+small specialist team, preserve the deliberation, and remember who contributed
+well.**
+
+## Demo
+
+Run the app locally:
 
 ```bash
-git clone <this repo>
-cd Hackathon_MongoDB
-
-# 1. Create the conda env (takes 3–8 minutes the first time).
 conda env create -f environment.yml
-
-# 2. Activate it.
-conda activate coalitions
-
-# 3. Verify the install.
-python -c "import pymongo, openai, streamlit, plotly, dotenv, langgraph, tiktoken; print('OK')"
-```
-
-
-A `requirements.txt` mirror is provided for non-conda users (`python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`), but the conda env remains the source of truth.
-
-### Configuring secrets
-
-```bash
-cp .env.example .env
-# Then edit .env with your real MongoDB URI and OpenAI key.
-```
-
-`.env` is gitignored. Never commit it.
-
----
-
-## Running
-
-> **Mock mode is the default.** It uses no API calls and a full pipeline run
-> finishes in under 5 seconds. This is what we use for the live demo.
-
-### Live demo (Streamlit UI)
-
-```bash
 conda activate coalitions
 streamlit run app.py
 ```
 
-Then, in the browser:
+In the app, click **Run pipeline**. The main tabs show:
 
-1. Click **🚀 Run pipeline** (a default prompt is pre-filled).
-2. Watch the live progress panel: stage progress bar, per-subtask
-   skills picked from vector search, agents assigned by greedy
-   set-cover with their solo scores, and who paired with whom.
-3. When the run finishes, the 10 result tabs populate from MongoDB:
-   **🌳 DAG**, **👥 Teams**, **💬 Council**, **✅ Validation**,
-   **💶 Cost**, **🎨 Rendering**, **📄 Report**,
-   **📈 Reputation**, **🕸️ Workflow**, **🍃 MongoDB**.
-4. Click **🔁 Replay current** to re-read the run from MongoDB only
-   (zero LLM calls, asserted by the orchestrator).
-5. The sidebar shows the 10 most recent runs — click any to switch.
+- **Methodology**: bird's-eye view of the approach.
+- **Task graph**: subtasks and dependencies.
+- **Teams**: selected skills and assigned agents.
+- **Council**: recorded team deliberation.
+- **Validation / Cost / Rendering / Report**: final package.
+- **Reputation**: per-run credit and memory.
 
-### CLI
+## Replay Mode
+
+The public Streamlit demo runs in strict replay mode. It does not call OpenAI
+live. Instead, it uses recorded LLM responses from:
+
+```text
+data/llm_replay_cache.json
+```
+
+Only the curated dropdown prompts are supported in this mode.
+
+To refresh the replay cache:
 
 ```bash
-python -m src.run --prompt "<your brief here>"
+# Run curated prompts once with live LLM calls and cache enabled.
+USE_MOCK_LLM=false python -m src.run --prompt "<demo prompt>"
+
+# Export the cached responses into the file used by Streamlit Cloud.
+python scripts/export_llm_cache.py
+```
+
+Commit the refreshed `data/llm_replay_cache.json` before deploying.
+
+## Setup
+
+Create the environment:
+
+```bash
+conda env create -f environment.yml
+conda activate coalitions
+python -c "import streamlit, pymongo, openai, langgraph; print('OK')"
+```
+
+Create local secrets:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` with your MongoDB connection string and, for live cache
+generation, an OpenAI API key.
+
+## CLI
+
+```bash
+python -m src.run --prompt "Build me a bridge for 50 cars per hour - modern design"
 python -m src.run --replay <run_id>
 ```
 
-### Tests
+## Tests
 
 ```bash
 pytest tests/ -v
 ```
 
-### Real LLM mode (used for the demo video, not the live run)
+## Deployment
 
-Set `USE_MOCK_LLM=false` in `.env`. The same code path applies; the
-only difference is `src.llm.openai_client` routes to OpenAI (or to
-OpenRouter if `OPENAI_BASE_URL` is set). Embeddings always go to
-OpenAI proper via `OPENAI_EMBEDDING_API_KEY`.
+The app is designed for Streamlit Community Cloud.
 
-### Replay-mode lockdown (publishing the demo without an OpenAI key)
+1. Deploy `app.py` from the `master` branch.
+2. Add `MONGODB_URI` and `MONGODB_DB` in Streamlit Secrets.
+3. Ensure `data/llm_replay_cache.json` is committed.
+4. Allow Streamlit Cloud to reach the MongoDB cluster.
 
-The published build forces `USE_MOCK_LLM=true` and locks the prompt
-input to a small dropdown of curated prompts. Captured real LLM
-responses are read from `data/llm_replay_cache.json` so the pipeline
-looks identical to a real run for those prompts; unknown payloads fall
-back to the deterministic stubs in `src/llm/mock.py`.
+The deployed app should use the committed replay cache for LLM outputs. If the Council tab shows generic placeholder text, the deployment is using stale code, stale persisted runs, or an incomplete replay cache.
 
-To refresh the captured cache:
+## Repository Map
 
-```bash
-# 1. Run each demo prompt once in real mode (with USE_LLM_CACHE=true,
-#    which is the default). MongoDB's llm_cache collection captures
-#    every chat + embed call.
-USE_MOCK_LLM=false python -m src.run --prompt "<demo prompt 1>"
-USE_MOCK_LLM=false python -m src.run --prompt "<demo prompt 2>"
-USE_MOCK_LLM=false python -m src.run --prompt "<demo prompt 3>"
-
-# 2. Export MongoDB llm_cache → data/llm_replay_cache.json (commit it).
-python scripts/export_llm_cache.py
+```text
+app.py                    Streamlit demo
+src/pipeline/             orchestration, synthesis, validation, cost, reporting
+src/agents/               team formation and Council protocol
+src/llm/                  live, cached, and replay LLM access
+data/llm_replay_cache.json recorded demo LLM responses
+docs/                     architecture notes and deeper methodology
 ```
 
-The Streamlit sidebar shows a "🔒 Replay mode" badge with the entry
-count and export date so judges can see at a glance that no API calls
-are being made.
+For deeper implementation notes, see:
 
----
-
-## Checking the MongoDB cluster is alive
-
-The Atlas free tier auto-pauses clusters after **60 days of inactivity**, and
-free clusters can also be evicted after long quiet periods. If you suspect
-the cluster has gone away (the deployed app shows
-`pymongo.errors.ConfigurationError`, or the local pipeline times out), run the
-health-check script:
-
-```bash
-conda run -n coalitions --no-capture-output python scripts/check_mongo.py
-```
-
-A healthy cluster prints, in order:
-
-```
-URI    : mongodb+srv://<user>:<redacted>@<your-cluster>/...
-DB     : agent_coalitions
-ping   : ok=1.0
-colls  : 14 -> [agents, artifacts, assignments, coalition_messages, ...]
-runs   : 180 documents
-skills : 70 documents
-vidx   : ok (search indexes: ['skills_embedding_vector'])
-```
-
-The script is in [scripts/check_mongo.py](scripts/check_mongo.py); exit code
-is `0` when everything is healthy, non-zero on ping failure or missing
-vector-search index. It's safe to wire into a `cron` job or a GitHub Action
-if you want a daily heartbeat.
-
-**If `ping` fails:**
-
-- Sign in at https://cloud.mongodb.com → check the cluster card. If it shows
-  *"Paused"*, click **Resume**. The free tier resumes in ~30 s.
-- Verify **Network Access → IP Access List** still contains `0.0.0.0/0`
-  (Streamlit Cloud has no fixed egress IPs) and your local IP if you're
-  running locally.
-- Verify the database user in **Database Access** still exists and has the
-  right role (`readWriteAnyDatabase` or scoped to `agent_coalitions`).
-- If the cluster has been **deleted**, restore from the data export under
-  [data/skills_seed.json](data/skills_seed.json) plus
-  [data/llm_replay_cache.json](data/llm_replay_cache.json) by re-running the
-  seed script in [src/db/seed.py](src/db/seed.py). The replay cache means
-  past run outputs aren't recoverable, but the demo can re-run any of the
-  three locked-in prompts from scratch in mock mode.
-
-**If `vidx` is `MISSING`:** the Atlas Vector Search index was dropped (Atlas
-sometimes does this on cluster tier changes). Recreate it from
-[src/db/indexes.py](src/db/indexes.py) — the constant
-`VECTOR_INDEX_DEFINITION` has the JSON the script POSTs to the Atlas Admin
-API.
-
----
-
-## Deploying to Streamlit Community Cloud
-
-The app is ready to deploy from this public GitHub repo to
-[share.streamlit.io](https://share.streamlit.io) — no code changes needed.
-
-1. **Sign in** at [share.streamlit.io](https://share.streamlit.io) with the
-   GitHub account that owns this repo.
-2. **New app** → pick `lcipolina/agent_coalitions`, branch `master`, main file
-   `app.py`. Python version is read from [runtime.txt](runtime.txt) (3.11).
-   Dependencies are read from [requirements.txt](requirements.txt).
-3. **Advanced settings → Secrets**: paste the contents of
-   [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example) with
-   real values. Only `MONGODB_URI` and `MONGODB_DB` are required — the
-   replay cache (`data/llm_replay_cache.json`) handles every demo prompt
-   without OpenAI calls.
-4. **MongoDB Atlas → Network Access**: add `0.0.0.0/0` to the IP allow-list
-   (Streamlit Cloud has no fixed egress IPs). Use a read-mostly user with a
-   strong password, since the cluster is now reachable from anywhere.
-5. **Deploy**. First build takes 2–3 minutes; subsequent pushes to `master`
-   redeploy automatically.
-
-The bridge from `st.secrets` → `os.environ` happens at the top of
-[app.py](app.py) before `src.core.config` is imported, so the same
-pydantic-settings code path is used locally (`.env`) and in the cloud
-(Secrets panel).
-
----
-
-## Repository layout
-
-See [docs/ARCHITECTURE.md §11](docs/ARCHITECTURE.md#11-repository-layout). The same document also contains the system-level design rationale behind every non-trivial choice in this codebase.
-
----
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/MATCHING_PIPELINE.md](docs/MATCHING_PIPELINE.md)
+- [docs/LANGGRAPH.md](docs/LANGGRAPH.md)
