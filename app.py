@@ -1027,27 +1027,35 @@ with tab_bb:
     except Exception:
         _chat_model, _mode_note = settings.openai_chat_model, ("live" if not settings.use_mock_llm else "mock")
     with st.container(border=True):
-        st.markdown("**Council protocol (3 rounds per subtask)**")
+        # Main Council tab explanation (gray color)
         st.markdown(
-            "- Round 0: marshal kickoff (brief + acceptance criteria)\n"
-            "- Round 1: agents each post one contribution (parallel)\n"
-            "- Round 2: marshal reconcile → final subtask output\n\n"
-            "Agents have one speaking turn in Round 1; they do not see peer messages, "
-            "only kickoff + upstream summaries (can be extended to multi-turn)."
+            "<span style='color:#6c757d'><b>Agentic Council.</b> This tab shows the agents' communication while solving their subtask. The marshal (🧭) starts off the conversation and coordinates each round; the agents (🤖) contribute their domain expertise; when the team is done the marshal summarises the result back to the orchestrator.</span>",
+            unsafe_allow_html=True
         )
-        st.caption(f"Model: `{_chat_model}` ({_mode_note})")
-    st.caption(
-        "**Agentic Council.** This shows the agents' communication while "
-        "solving their subtask. The marshal (\U0001f9ed) starts off the "
-        "conversation and coordinates each round; the agents (\U0001f916) "
-        "contribute their domain expertise; when the team is done the marshal "
-        "summarises the result back to the orchestrator."
-    )
-    st.caption(
-        "Note: lines like “Criteria 1”, “Criteria 2” are acceptance "
-        "criteria (the checklist the team will be judged on). The full "
-        "list appears in the Validation tab."
-    )
+        st.markdown(
+            "<span style='color:#6c757d'>Note: lines like “Criteria 1”, “Criteria 2” are acceptance criteria (the checklist the team will be judged on). The full list appears in the Validation tab.</span>",
+            unsafe_allow_html=True
+        )
+        # Protocol and model info (same gray)
+        st.markdown(
+            "<span style='color:#6c757d'><b>Council protocol (3 rounds per subtask)</b></span>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<span style='color:#6c757d'>"
+            "<ul style='margin-bottom:0.5em'>"
+            "<li>Round 0: marshal kickoff (brief + acceptance criteria)</li>"
+            "<li>Round 1: agents each post one contribution (parallel)</li>"
+            "<li>Round 2: marshal reconcile → final subtask output</li>"
+            "</ul>"
+            "Agents have one speaking turn in Round 1; they do not see peer messages, only kickoff + upstream summaries (can be extended to multi-turn)."
+            "</span>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f"<span style='color:#6c757d'>Model: <code>{_chat_model}</code> ({_mode_note})</span>",
+            unsafe_allow_html=True
+        )
     msgs = list(
         db.coalition_messages.find({"run_id": run_id}, {"_id": 0})
         .sort([("subtask_id", 1), ("round", 1), ("ts", 1)])

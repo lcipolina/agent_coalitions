@@ -32,6 +32,11 @@ Tracked items deliberately deferred from the 1-day MVP. See `MVP_DESIGN.md` Amen
 - [x] Cache LLM responses in Mongo `llm_cache` collection (Q12). *(On `master` — opt-in via `USE_LLM_CACHE`, default on; cache hits do not bump the LLM call counter, preserving G9 replay semantics.)*
 - [ ] Verify "mock mode" is a single global flag inherited by every LLM call site (currently planned via `src.config.settings.use_mock_llm`); add a runtime assertion that no chat call goes out when the flag is true.
 
+- [ ] Configurable council depth (`n_agent_rounds`). Implement a loop of N agent rounds before marshal reconcile; default `N=1` to keep demo fast. Variants:
+    - Option A (light): no cross-visibility; agents refine on marshal feedback.
+    - Option B (richer): cross-visibility; agents can read prior council messages.
+    - Update `prompts/agent.j2` and `execution.execute_subtask()`; add UI round labels; bound token costs; keep replay invariants.
+
 - [x] **Rename "blackboard" out of the codebase.** *(Done 2026-05-06; updated 2026-05-14.)* Module renamed to `src/agents/agent_comms.py`; user-facing label is now **Council** (UI tab) and **team message bus** in prose. Imports in `src/agents/marshal.py` and `src/pipeline/execution.py` updated; docstrings + comments scrubbed in `src/agents/agent_comms.py`, `src/agents/marshal.py`, `src/pipeline/execution.py`, `src/llm/mock.py`. Doc sweep applied to `MVP_DESIGN.md`, `LANGGRAPH.md`, `ARCHITECTURE.md`. MongoDB collection `coalition_messages` deliberately left unchanged.
 
 
