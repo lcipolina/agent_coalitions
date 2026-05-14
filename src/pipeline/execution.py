@@ -230,25 +230,29 @@ def _candidates_for(subtask: dict) -> list[CandidateSkill]:
     return filtered[:15]
 
 
-def execute_subtask(run_id: str, subtask: dict, upstream_outputs: list[dict],
-                                        criteria: list[dict] | None = None) -> dict:
-        """Run the per-subtask execution loop and persist its artifacts.
+def execute_subtask(
+    run_id: str,
+    subtask: dict,
+    upstream_outputs: list[dict],
+    criteria: list[dict] | None = None,
+) -> dict:
+    """Run the per-subtask execution loop and persist its artifacts.
 
-        Steps:
-            1. Retrieve candidate skills via vector search
-            2. Form a coalition of skills and cover them with agents
-            3. Round 0 marshal kickoff → Round 1 agents → Round 2 marshal reconcile
-            4. Write the assignment, council messages, and ``subtask_outputs`` row
+    Steps:
+        1. Retrieve candidate skills via vector search
+        2. Form a coalition of skills and cover them with agents
+        3. Round 0 marshal kickoff → Round 1 agents → Round 2 marshal reconcile
+        4. Write the assignment, council messages, and ``subtask_outputs`` row
 
-        Args:
-                run_id: The active run identifier.
-                subtask: The subtask document (id/title/deps) to execute.
-                upstream_outputs: Summaries from upstream subtasks for context.
-                criteria: Optional acceptance-criteria list for the kickoff.
+    Args:
+        run_id: The active run identifier.
+        subtask: The subtask document (id/title/deps) to execute.
+        upstream_outputs: Summaries from upstream subtasks for context.
+        criteria: Optional acceptance-criteria list for the kickoff.
 
-        Returns:
-                dict: The persisted ``subtask_outputs`` document.
-        """
+    Returns:
+        dict: The persisted ``subtask_outputs`` document.
+    """
     db = get_db()
     db.subtasks.update_one(
         {"run_id": run_id, "subtask_id": subtask["subtask_id"]},
