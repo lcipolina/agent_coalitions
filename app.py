@@ -175,6 +175,16 @@ def _agent_label(agent_id: str) -> str:
     return _agent_display_map().get(agent_id, agent_id)
 
 
+def _team_label(sid: str) -> str:
+    """Return a friendlier label for a subtask id like 'T7' → 'Team 7'."""
+    try:
+        if sid and sid[0].upper() == "T" and sid[1:].isdigit():
+            return f"Team {int(sid[1:])}"
+    except Exception:
+        pass
+    return sid
+
+
 # ----------------------------------------------------------------------------
 # Session state init
 # ----------------------------------------------------------------------------
@@ -392,8 +402,9 @@ def _live_listener_factory(
 
         elif kind == "subtask_start":
             # One subtask (T1/T2/...) entered its execution loop
+            _label = _team_label(info.get('subtask_id', ''))
             subtask_box.markdown(
-                f"### 🎯  {info['subtask_id']} — {info['title']}  "
+                f"### 🎯  {_label} — {info['title']}  "
                 f"`({info['idx']}/{info['total']})`"
             )
             skill_box.empty()
@@ -515,8 +526,8 @@ if metrics:
         "conceptual_fail": "Needs review",
     }.get(_vs, _vs)
     c3.metric("Validation", _vs_soft)
-    cost = metrics.get("estimated_cost_eur")
-    c4.metric("Cost (EUR)", f"{cost:,.0f}" if isinstance(cost, (int, float)) else "—")
+    # cost = metrics.get("estimated_cost_eur")
+    # c4.metric("Cost (EUR)", f"{cost:,.0f}" if isinstance(cost, (int, float)) else "—")
 
 # NOTE: "Concept render" tab is hidden for now (we will re-enable it later).
 # Keep the body block below intact so it can be brought back by re-adding
@@ -787,9 +798,10 @@ with tab_dag:
             )
             # Escape any double-quotes that would break the dot label.
             safe_title = title.replace('"', "'")
+            safe_team = _team_label(sid).replace('"', "'")
             org_lines.append(
                 f'  {marshal_node} '
-                f'[label="🧭 Marshal\\n{sid}: {safe_title}", '
+                f'[label="🧭 Marshal\\n{safe_team}: {safe_title}", '
                 f'fillcolor="#d35400", fontcolor=white];'
             )
             org_lines.append(f"  ORCH -> {marshal_node};")
@@ -849,7 +861,7 @@ with tab_coal:
                 _agent_label(aid) for aid in a["coalition_agent_ids"]
             ]
             with st.expander(
-                f"**{sid} \u2014 {team_title}**  \u00b7  agents: "
+                f"**{_team_label(sid)} \u2014 {team_title}**  \u00b7  agents: "
                 f"{', '.join(agent_labels)}",
                 expanded=False,
             ):
@@ -969,7 +981,7 @@ with tab_bb:
         last_st = None
         for m in msgs:
             if m["subtask_id"] != last_st:
-                st.markdown(f"#### {m['subtask_id']}")
+                st.markdown(f"#### {_team_label(m['subtask_id'])}")
                 last_st = m["subtask_id"]
             avatar = "🧭" if m["role"] == "marshal" else "🤖"
             with st.chat_message("assistant", avatar=avatar):
