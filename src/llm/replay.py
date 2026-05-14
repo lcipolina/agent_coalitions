@@ -10,8 +10,8 @@ Design:
   used by the live MongoDB cache. We rehash here using the **captured**
   model names from the JSON's ``meta`` block (not the live ``settings``
   values) so a model swap in ``.env`` won't silently miss every entry.
-* Loading is lazy and memoised. Missing file → empty cache (the mock
-  stubs in ``src/llm/mock.py`` are still available as a fallback).
+* Loading is lazy and refreshes when the JSON changes on disk. Missing file
+  → empty cache; callers decide whether to fall back or fail strictly.
 * This module never reads from MongoDB and never imports the OpenAI SDK,
   so the published demo can run with neither configured.
 """
@@ -127,6 +127,27 @@ def lookup(kind: str, payload: str) -> Any | None:
     if row is None:
         return None
     return row.get("response")
+
+
+def lookup_chat_by_role(role: str) -> Any | None:
+    """Return a recorded chat response for ``role`` when exact prompts drift.
+
+    This is intentionally weaker than :func:`lookup` and should only be used
+    for late-stage narrative roles whose prompts include volatile deterministic
+    numbers. Council messages should use exact prompt hashes.
+    """
+    _load()
+    if not _entries:
+        return None
+    prefix = f"{role}\x1f"
+    match = None
+    for row in _entries.values():
+        if row.get("kind") != "chat":
+            continue
+        preview = row.get("preview", "")
+        if isinstance(preview, str) and preview.startswith(prefix):
+            match = row
+    return match.get("response") if match else None
 
 
 def agent_order_for(

@@ -16,8 +16,10 @@ from typing import Any
 
 # The published demo runs entirely from the captured replay cache
 # (data/llm_replay_cache.json) — no OpenAI key, no network calls.
-# Force mock mode here so toggling cannot accidentally hit the API.
+# Force strict replay mode here so toggling cannot accidentally hit the API
+# or fall through to generic mock responses.
 os.environ["USE_MOCK_LLM"] = "true"
+os.environ["STRICT_REPLAY"] = "true"
 
 import streamlit as st  # noqa: E402
 

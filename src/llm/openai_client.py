@@ -36,6 +36,21 @@ _lock = Lock()
 # embeds the same string a moment later). Cache hits do not bump the
 # call counter, keeping G9 honest.
 _embed_cache: dict[tuple[str, str], list[float]] = {}
+_VOLATILE_REPLAY_ROLES = {"surveyor_narrative", "reporter"}
+
+
+class ReplayCacheMiss(RuntimeError):
+    """Raised when strict replay mode cannot find a recorded response."""
+
+
+def _replay_miss(kind: str, role: str | None, payload: str) -> ReplayCacheMiss:
+    label = f"{kind}:{role}" if role else kind
+    preview = payload.replace("\n", " ")[:180]
+    return ReplayCacheMiss(
+        f"Strict replay cache miss for {label}. Refresh "
+        "`data/llm_replay_cache.json` from a live run before demoing this "
+        f"prompt. Payload preview: {preview!r}"
+    )
 
 
 def reset_counter() -> None:
@@ -101,11 +116,13 @@ def embed(text: str) -> list[float]:
     if settings.use_mock_llm:
         # Demo / publish path: prefer captured real responses from
         # data/llm_replay_cache.json so the curated prompts look like
-        # they did during the hackathon. Unknown payloads fall through
-        # to deterministic stubs in src/llm/mock.py.
+        # they did during the hackathon. In strict replay mode, a missing
+        # payload is an error rather than a silent mock fallback.
         cached = _replay.lookup("embed", text)
         if cached is not None:
             return cached
+        if settings.strict_replay:
+            raise _replay_miss("embed", None, text)
         return _mock.embed(text)
     key = (settings.openai_embedding_model, text)
     cached = _embed_cache.get(key)
@@ -145,10 +162,18 @@ def chat(prompt: str, role: str = "agent", **kwargs: Any) -> str:
         str: The LLM-generated response.
     """
     if settings.use_mock_llm:
-        # See note in ``embed`` — replay first, generic stubs second.
-        cached = _replay.lookup("chat", f"{role}\x1f{prompt}")
+        # See note in ``embed`` — replay first; strict replay never falls
+        # through to generic mock stubs.
+        payload = f"{role}\x1f{prompt}"
+        cached = _replay.lookup("chat", payload)
         if cached is not None:
             return cached
+        if settings.strict_replay:
+            if role in _VOLATILE_REPLAY_ROLES:
+                recorded = _replay.lookup_chat_by_role(role)
+                if recorded is not None:
+                    return recorded
+            raise _replay_miss("chat", role, prompt)
         return _mock.chat(prompt, role=role, **kwargs)
     cache_payload = f"{role}\x1f{prompt}"
     persisted = _cache_get("chat", settings.openai_chat_model, cache_payload)
