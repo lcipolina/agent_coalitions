@@ -15,6 +15,11 @@ from src.db.writes import log_event
 
 
 def _now() -> datetime:
+    """Return the current UTC timestamp.
+
+    Returns:
+        datetime: A timezone-aware UTC datetime.
+    """
     return datetime.now(timezone.utc)
 
 
@@ -27,7 +32,20 @@ def post(
     text: str,
     meta: dict[str, Any] | None = None,
 ) -> None:
-    """Insert a single coalition message and emit a paired ``message_posted`` event."""
+    """Insert one council message and emit a paired ``message_posted`` event.
+
+    Args:
+        run_id: Run identifier this message belongs to.
+        subtask_id: Subtask identifier (e.g. ``"T3"``).
+        sender: Agent id of the sender (``"agent_###"`` or marshal id).
+        role: Role label for display (e.g. ``"agent"`` or ``"marshal"``).
+        round_: Council round number (0 kickoff, 1 agents, 2 reconcile).
+        text: Message body text.
+        meta: Optional message metadata payload.
+
+    Returns:
+        None
+    """
     db = get_db()
     db.coalition_messages.insert_one({
         "run_id": run_id,
@@ -44,7 +62,16 @@ def post(
 
 
 def read(run_id: str, subtask_id: str, *, max_round: int | None = None) -> list[dict]:
-    """Return coalition messages for one subtask, optionally capped at ``max_round``."""
+    """Fetch council messages for a subtask, optionally capped by round.
+
+    Args:
+        run_id: Run identifier.
+        subtask_id: Subtask identifier to filter messages.
+        max_round: If provided, return messages with ``round <= max_round``.
+
+    Returns:
+        list[dict]: Messages sorted by timestamp ascending, with ``_id`` omitted.
+    """
     q: dict[str, Any] = {"run_id": run_id, "subtask_id": subtask_id}
     if max_round is not None:
         q["round"] = {"$lte": max_round}
@@ -52,7 +79,15 @@ def read(run_id: str, subtask_id: str, *, max_round: int | None = None) -> list[
 
 
 def render_log(run_id: str, subtask_id: str) -> str:
-    """Render the full message log for a subtask as a single human-readable string."""
+    """Render a subtask's full message log as a human-readable string.
+
+    Args:
+        run_id: Run identifier.
+        subtask_id: Subtask identifier.
+
+    Returns:
+        str: Multi-line formatted log combining round, role, sender, and text.
+    """
     rows = read(run_id, subtask_id)
     return "\n".join(
         f"[r{r['round']} {r['role']}:{r['sender']}] {r['text']}" for r in rows
