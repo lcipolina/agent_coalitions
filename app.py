@@ -964,6 +964,23 @@ with tab_coal:
 
 # ----- Council (multi-agent deliberation) -----------------------------------
 with tab_bb:
+    # Council overview: make the protocol explicit and surface the model used
+    try:
+        from src.llm import replay as _replay_meta  # lazy import inside tab
+        _chat_model = _replay_meta.meta().get("chat_model") or settings.openai_chat_model
+        _mode_note = "replay" if _replay_meta.is_available() else ("live" if not settings.use_mock_llm else "mock")
+    except Exception:
+        _chat_model, _mode_note = settings.openai_chat_model, ("live" if not settings.use_mock_llm else "mock")
+    with st.container(border=True):
+        st.markdown("**Council protocol (3 rounds per subtask)**")
+        st.markdown(
+            "- Round 0: marshal kickoff (brief + acceptance criteria)\n"
+            "- Round 1: agents each post one contribution (parallel)\n"
+            "- Round 2: marshal reconcile → final subtask output\n\n"
+            "Agents have one speaking turn in Round 1; they do not see peer messages, "
+            "only kickoff + upstream summaries (can be extended to multi-turn)."
+        )
+        st.caption(f"Model: `{_chat_model}` ({_mode_note})")
     st.caption(
         "**Agentic Council.** This shows the agents' communication while "
         "solving their subtask. The marshal (\U0001f9ed) starts off the "
