@@ -13,6 +13,7 @@ import numpy as np
 
 from src.agents.agent_comms import post
 from src.agents.coalitions import CandidateSkill, form_coalition, shapley_values
+from src.core.config import settings
 from src.db.client import get_db
 from src.db.writes import insert_with_event, log_event
 from src.llm.openai_client import chat, embed
@@ -22,6 +23,7 @@ from src.db.matching import search_skills
 from src.agents.set_cover import cover_skills_with_agents
 from src.core.progress import emit
 from src.core.tokens import truncate_to_tokens
+from src.llm import replay as llm_replay
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +273,19 @@ def execute_subtask(
     shapley_by_skill = shapley_values(coalition)
     agents = cover_skills_with_agents(coalition_skill_ids, max_agents=3)
     coalition_agent_ids = [a["agent_id"] for a in agents] or [MARSHAL_ID]
+    replay_order = (
+        llm_replay.agent_order_for(
+            subtask["subtask_id"],
+            subtask["title"],
+            coalition_agent_ids,
+        )
+        if settings.use_mock_llm and llm_replay.is_available()
+        else None
+    )
+    if replay_order:
+        by_id = {a["agent_id"]: a for a in agents}
+        agents = [by_id[aid] for aid in replay_order]
+        coalition_agent_ids = replay_order
 
     # Build the per-agent contribution table by iterating over the agents
     # the set-cover step actually returned. Each agent gets the slice of the

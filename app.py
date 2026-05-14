@@ -548,9 +548,9 @@ if run_clicked:
         except Exception as e:  # noqa: BLE001
             stage_status.error(
                 f"⚠️ Pipeline failed: **{type(e).__name__}** — {e}\n\n"
-                "This usually happens when the LLM returns malformed JSON or "
-                "an unsupported domain shape. Try the prompt again or switch "
-                "Mock LLM ON in the sidebar for a deterministic run."
+                "This replay-mode demo only supports the captured prompts in "
+                "the dropdown. To add another prompt, run it once in live mode "
+                "outside Streamlit and refresh `data/llm_replay_cache.json`."
             )
         finally:
             st.session_state.running = False

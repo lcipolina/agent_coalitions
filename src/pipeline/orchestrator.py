@@ -21,8 +21,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.core.config import settings
 from src.db.client import get_db
+from src.db.seed import seed_agents
 from src.db.writes import log_event
+from src.llm import replay as llm_replay
 from src.pipeline._run_utils import (
     build_summary,
     ensure_run,
@@ -51,6 +54,9 @@ def run_pipeline(prompt: str) -> dict[str, Any]:
     Each stage writes its own MongoDB rows (and ≥ 1 ``events`` row, per G6).
     Progress hints are emitted via :mod:`src.core.progress` for live UIs.
     """
+    if settings.use_mock_llm and llm_replay.is_available():
+        seed_agents()
+
     run_id = ensure_run(prompt)
     log.info("pipeline run_id=%s prompt=%r", run_id, prompt)
     emit("pipeline_start", {"prompt": prompt, "run_id": run_id})

@@ -26,7 +26,10 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, StateGraph
 
+from src.core.config import settings
 from src.core.progress import emit
+from src.db.seed import seed_agents
+from src.llm import replay as llm_replay
 from src.pipeline._run_utils import (
     build_summary,
     ensure_run,
@@ -78,6 +81,9 @@ class GraphState(TypedDict, total=False):
 
 
 def ensure_run_node(state: GraphState) -> GraphState:
+    if settings.use_mock_llm and llm_replay.is_available():
+        seed_agents()
+
     run_id = ensure_run(state["prompt"])
     log.info("langgraph pipeline run_id=%s prompt=%r", run_id, state["prompt"])
     emit("pipeline_start", {"prompt": state["prompt"], "run_id": run_id})

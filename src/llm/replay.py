@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,7 @@ log = logging.getLogger(__name__)
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "llm_replay_cache.json"
 
 _loaded: bool = False
+_loaded_mtime_ns: int | None = None
 _entries: dict[str, dict[str, Any]] = {}
 _meta: dict[str, Any] = {}
 
@@ -45,10 +47,18 @@ def _cache_key(kind: str, model: str, payload: str) -> str:
 
 
 def _load(path: Path = _DEFAULT_PATH) -> None:
-    global _loaded, _entries, _meta
-    if _loaded:
+    global _loaded, _loaded_mtime_ns, _entries, _meta
+    try:
+        mtime_ns = path.stat().st_mtime_ns
+    except FileNotFoundError:
+        mtime_ns = None
+
+    if _loaded and _loaded_mtime_ns == mtime_ns:
         return
     _loaded = True
+    _loaded_mtime_ns = mtime_ns
+    _entries = {}
+    _meta = {}
     if not path.exists():
         log.info("replay cache not found at %s — running with mock stubs only", path)
         return
@@ -117,3 +127,47 @@ def lookup(kind: str, payload: str) -> Any | None:
     if row is None:
         return None
     return row.get("response")
+
+
+def agent_order_for(
+    subtask_id: str,
+    title: str,
+    agent_ids: list[str],
+) -> list[str] | None:
+    """Return the recorded replay order for a subtask's agent set, if known.
+
+    The file-backed cache stores only prompt previews, not full prompts, but
+    agent previews include the stable agent id plus ``subtask_id`` and title.
+    When replay-mode recomputes the same agent set in a different order, this
+    lets the pipeline restore the order used by the captured live run so the
+    downstream marshal/agent prompt hashes remain cache hits.
+    """
+    _load()
+    if not _entries or not agent_ids:
+        return None
+
+    target = set(agent_ids)
+    n_agents = len(agent_ids)
+    if len(target) != n_agents:
+        return None
+
+    marker = f"contributing to subtask {subtask_id}\n({title})"
+    seen: list[str] = []
+    for row in _entries.values():
+        if row.get("kind") != "chat":
+            continue
+        preview = row.get("preview", "")
+        if not isinstance(preview, str):
+            continue
+        if not preview.startswith("agent\x1f") or marker not in preview:
+            continue
+        match = re.search(r"agent (agent_\d+), contributing", preview)
+        if match and match.group(1) in target:
+            seen.append(match.group(1))
+
+    matched_order: list[str] | None = None
+    for i in range(0, max(len(seen) - n_agents + 1, 0)):
+        window = seen[i:i + n_agents]
+        if len(set(window)) == n_agents and set(window) == target:
+            matched_order = window
+    return matched_order
