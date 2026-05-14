@@ -91,6 +91,12 @@ def embed(text: str) -> list[float]:
     additional MongoDB-backed cache (`llm_cache` collection) survives
     across processes and runs; cache hits do **not** bump the call
     counter.
+
+    Args:
+        text: The string to embed.
+
+    Returns:
+        list[float]: The embedding vector.
     """
     if settings.use_mock_llm:
         # Demo / publish path: prefer captured real responses from
@@ -129,6 +135,14 @@ def chat(prompt: str, role: str = "agent", **kwargs: Any) -> str:
     are cached in the ``llm_cache`` MongoDB collection keyed by a
     deterministic hash of (model, role, prompt); cache hits do **not**
     bump the call counter.
+
+    Args:
+        prompt: The user prompt or message to send.
+        role: The pipeline role label (e.g. "agent", "marshal").
+        **kwargs: Additional keyword arguments for the mock router.
+
+    Returns:
+        str: The LLM-generated response.
     """
     if settings.use_mock_llm:
         # See note in ``embed`` — replay first, generic stubs second.

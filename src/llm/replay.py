@@ -68,13 +68,21 @@ def _load(path: Path = _DEFAULT_PATH) -> None:
 
 
 def meta() -> dict[str, Any]:
-    """Return the metadata block from the loaded JSON (empty if not loaded)."""
+    """Return the metadata block from the loaded JSON (empty if not loaded).
+
+    Returns:
+        dict[str, Any]: The metadata block (may be empty).
+    """
     _load()
     return dict(_meta)
 
 
 def is_available() -> bool:
-    """True if the replay cache file was found and contains entries."""
+    """Return True if the replay cache file was found and contains entries.
+
+    Returns:
+        bool: True if the cache is loaded and non-empty.
+    """
     _load()
     return len(_entries) > 0
 
@@ -85,6 +93,13 @@ def lookup(kind: str, payload: str) -> Any | None:
     ``kind`` is ``"chat"`` or ``"embed"``. The model name is taken from
     the captured ``meta`` block, **not** from live settings, so the lookup
     is robust to ``.env`` drift between capture and replay.
+
+    Args:
+        kind: The type of response ("chat" or "embed").
+        payload: The prompt or text to look up.
+
+    Returns:
+        Any | None: The captured response, or None if not found.
     """
     _load()
     if not _entries:

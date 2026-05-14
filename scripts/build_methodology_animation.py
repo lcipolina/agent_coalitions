@@ -368,12 +368,15 @@ def render_dot(state: dict) -> str:
 
 
 def build_frames() -> list[dict]:
-    """Build the cumulative state for each frame.
+    """Build the list of animation frames (dicts with state and timing).
 
     Forward phase: ~14 frames at ~0.35 s each = ~4.9 s.
     Backward pulse: 2 frames at 0.4 s = 0.8 s.
     Hold (full diagram): 4 frames at 0.3 s = 1.2 s.
     Total: ~7 s.
+
+    Returns:
+        list[dict]: Animation frames with state and timing.
     """
     state: dict = {}
     frames: list[dict] = []
@@ -411,7 +414,12 @@ def build_frames() -> list[dict]:
 
 
 def render_frame(state: dict, out_path: Path) -> None:
-    """Render one frame to PNG via the `dot` CLI."""
+    """Render a single animation frame to an image file.
+
+    Args:
+        state: Animation state dict.
+        out_path: Output image file path.
+    """
     import subprocess
     dot_src = render_dot(state)
     dot_file = out_path.with_suffix(".dot")
@@ -424,6 +432,11 @@ def render_frame(state: dict, out_path: Path) -> None:
 
 
 def main() -> None:
+    """Entry point: build and export the animation.
+
+    Returns:
+        None
+    """
     frames_state = build_frames()
     print(f"[methodology-anim] {len(frames_state)} frames")
 
