@@ -223,16 +223,23 @@ def _deterministic_two_bucket(spec: dict, cm: dict) -> tuple[dict, str]:
 # Public entry point
 # ---------------------------------------------------------------------------
 def estimate(run_id: str, spec: dict) -> dict:
-    """Build a 2-bucket conceptual cost estimate for ``run_id``.
+    """Build and persist a 2-bucket conceptual cost estimate for a run.
 
-    Output line items are exactly two: **Materials** (rolled-up rate-card
-    cost of physical components) and **Man-hours** (total construction
-    labour hours × a blended rate). This is intentionally simple — at the
-    conceptual stage anything more granular is false precision.
+    Output line items are exactly two: Materials (rolled-up rate-card cost of
+    physical components) and Man-hours (total construction labour hours × a
+    blended rate). At the conceptual stage, anything more granular is false
+    precision.
 
-    Mock mode uses the deterministic builders so the demo is reproducible.
-    Real mode tries the LLM path first and falls back to the deterministic
-    builder on any parse / validation failure.
+    In mock mode the deterministic builders are used for reproducibility.
+    In real mode the LLM path is attempted first, with a deterministic
+    fallback on any parse/validation failure.
+
+    Args:
+        run_id: The active run identifier.
+        spec: The synthesised design specification.
+
+    Returns:
+        dict: The persisted ``cost_estimates`` document.
     """
     cm = _load_cost_model()
 

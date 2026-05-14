@@ -104,7 +104,15 @@ _FALLBACK_SPEC = {
 
 
 def derive_validation_spec(run_id: str, prompt: str) -> dict[str, Any]:
-    """Produce the validation_spec for ``run_id`` and persist it on runs."""
+    """Derive the acceptance-criteria spec from the prompt and persist it.
+
+    Args:
+        run_id: The current run identifier.
+        prompt: The user prompt from which to derive criteria.
+
+    Returns:
+        dict[str, Any]: The validated ``validation_spec`` stored on the run.
+    """
     raw = chat(render("validator_spec", prompt=prompt), role="validator_spec")
     try:
         spec = _validate(json.loads(_strip_code_fences(raw)))

@@ -142,9 +142,19 @@ def build_report(run_id: str, prompt: str, spec: dict, validation: dict, cost: d
     """Assemble the final markdown report and persist it as an artifact.
 
     The report combines an LLM-generated introduction with deterministic
-    tables (bridge characteristics, validation outcome, cost roll-up,
+    tables (design characteristics, validation outcome, cost roll-up,
     per-subtask team contributions). Stored both as an ``artifacts`` row
-    of kind ``final_report_md`` and on the ``runs`` row directly.
+    of kind ``final_report_md`` and on the ``runs`` row for convenience.
+
+    Args:
+        run_id: The active run identifier.
+        prompt: The original user prompt.
+        spec: The synthesised design specification.
+        validation: The validation results document.
+        cost: The conceptual cost estimate document.
+
+    Returns:
+        str: The full markdown report body.
     """
     intro = chat(
         render("reporter", prompt=prompt, spec=spec, validation=validation, cost=cost),

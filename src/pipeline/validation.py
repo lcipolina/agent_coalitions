@@ -211,11 +211,18 @@ def _evaluate_criterion(criterion: dict, spec: dict) -> dict:
 
 
 def validate(run_id: str, spec: dict) -> dict:
-    """Evaluate the run's criteria against ``spec`` and persist the result.
+    """Evaluate acceptance criteria and judge scores, then persist results.
 
-    Combines structured criterion checks (with overall status aggregated
-    over the quantitative ones only) with a per-subtask LLM judge pass
-    rating clarity / completeness / consistency.
+    Combines structured criterion checks (overall aggregated over
+    quantitative ones only) with a per-subtask LLM judge pass rating
+    clarity, completeness, and consistency.
+
+    Args:
+        run_id: The active run identifier.
+        spec: The synthesised design specification to validate.
+
+    Returns:
+        dict: The persisted ``validation_results`` document.
     """
     db = get_db()
     run_doc = db.runs.find_one({"run_id": run_id}, {"_id": 0, "validation_spec": 1})
