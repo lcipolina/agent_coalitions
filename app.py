@@ -971,6 +971,11 @@ with tab_bb:
         "contribute their domain expertise; when the team is done the marshal "
         "summarises the result back to the orchestrator."
     )
+    st.caption(
+        "Note: lines like “Criteria 1”, “Criteria 2” are acceptance "
+        "criteria (the checklist the team will be judged on). The full "
+        "list appears in the Validation tab."
+    )
     msgs = list(
         db.coalition_messages.find({"run_id": run_id}, {"_id": 0})
         .sort([("subtask_id", 1), ("round", 1), ("ts", 1)])
@@ -989,7 +994,13 @@ with tab_bb:
                     f"**{_agent_label(m['sender'])}**  ·  round {m['round']}  ·  "
                     f"_{m['role']}_"
                 )
-                st.write(m["text"])
+                # Replace internal criterion tags like [C1] with a
+                # friendlier label "Criteria 1" for general audiences.
+                import re as _re
+                _msg_text = m.get("text", "")
+                if isinstance(_msg_text, str):
+                    _msg_text = _re.sub(r"\[C(\d+)\]", r"Criteria \1", _msg_text)
+                st.write(_msg_text)
 
 
 # ----- Validation -----------------------------------------------------------
