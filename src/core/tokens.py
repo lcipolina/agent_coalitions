@@ -1,4 +1,3 @@
-"""Token counting / truncation helpers using tiktoken (cl100k_base)."""
 """
 Token counting / truncation helpers using tiktoken (cl100k_base).
 
