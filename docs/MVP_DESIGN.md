@@ -78,7 +78,7 @@ We deliberately do **not** claim this is a market in the economic sense. There a
 |---|---|---|
 | Agent discovery | Hardcoded list | Vector search over real skills catalog |
 | Coalition selection | Brute force or hand-wiring | Pairwise complementarity (rank-1 Shapley) |
-| Inter-agent comms | RPC, queue, or implicit | Mongo append-only communication forum |
+| Council (multi-agent deliberation) | RPC, queue, or implicit | Mongo append-only communication forum |
 | Context sharing | Pass full outputs | Marshal-consolidated summaries only |
 | Audit trail | Logs scattered in stdout | Single Mongo source of truth, judge-visible |
 | Reputation | None | Persistent across runs |

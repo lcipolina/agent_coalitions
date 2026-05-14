@@ -75,7 +75,7 @@ Then, in the browser:
    skills picked from vector search, agents assigned by greedy
    set-cover with their solo scores, and who paired with whom.
 3. When the run finishes, the 10 result tabs populate from MongoDB:
-   **🌳 DAG**, **👥 Teams**, **💬 Agent comms**, **✅ Validation**,
+   **🌳 DAG**, **👥 Teams**, **💬 Council**, **✅ Validation**,
    **💶 Cost**, **🎨 Rendering**, **📄 Report**,
    **📈 Reputation**, **🕸️ Workflow**, **🍃 MongoDB**.
 4. Click **🔁 Replay current** to re-read the run from MongoDB only

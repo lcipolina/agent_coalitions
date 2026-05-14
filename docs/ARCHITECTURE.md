@@ -39,7 +39,7 @@ The system is six packages, each with a single concern. The UI talks only to the
 ```mermaid
 flowchart LR
     subgraph UI["Streamlit UI (app.py)"]
-        TABS["Tabs: Plan · Coalitions · Agent comms ·\nSpec · Validation · Cost · Rendering · Report"]
+        TABS["Tabs: Plan · Coalitions · Council ·\nSpec · Validation · Cost · Rendering · Report"]
     end
 
     subgraph PIPE["src/pipeline (orchestrator + 9 stages)"]
@@ -358,7 +358,7 @@ src/
   agents/
     coalitions.py            # rank-1 Shapley + pairwise complementarity
     set_cover.py             # weighted greedy skill→agent set cover
-    agent_comms.py           # post / read coalition_messages (team message bus; user-facing label is "agent comms" / "communication forum")
+    agent_comms.py           # post / read coalition_messages (team message bus; user-facing label is "Council")
     marshal.py               # round 0 kickoff + round 2 reconcile
 
   pipeline/

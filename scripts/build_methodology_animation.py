@@ -27,10 +27,117 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import imageio.v2 as imageio
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "docs" / "social"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
+IMG_DIR = OUT_DIR / "img"
+
+# (prompt text, image path, banner)
+RESULT_FRAMES = [
+    ("Design a bridge for 50 cars/h \u2014 modern",
+     IMG_DIR / "bridge.png",
+     "Same pipeline. Any domain."),
+    ("Design a roller coaster for 50 people \u2014 modern",
+     IMG_DIR / "rollercoaster.png",
+     "Same pipeline. Any domain."),
+    ("Design an airplane for 200 people",
+     IMG_DIR / "airplane.png",
+     "Same pipeline. Any domain."),
+]
+
+
+def _load_font(size: int) -> ImageFont.ImageFont:
+    """Best-effort load of a system font; fall back to default bitmap."""
+    candidates = [
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def compose_result_frame(prompt: str, image_path: Path, banner: str,
+                         canvas_w: int, canvas_h: int) -> Image.Image:
+    """Compose a result frame: banner + prompt on top, big image below,
+    footer note pinned to the bottom. Content is laid out in a centered
+    column so the image stays large even on a wide diagram canvas.
+    """
+    bg = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
+    draw = ImageDraw.Draw(bg)
+    margin_v = 24
+
+    # Working column width: at most 1.5x the height (squarer than the
+    # wide diagram canvas) so the rendered image isn't dwarfed.
+    col_w = min(canvas_w - 80, int(canvas_h * 1.6))
+    col_x = (canvas_w - col_w) // 2
+
+    # Banner (top, amber).
+    banner_font = _load_font(40)
+    bw, bh = draw.textbbox((0, 0), banner, font=banner_font)[2:]
+    draw.text(((canvas_w - bw) // 2, 16), banner,
+              fill="#b58900", font=banner_font)
+    y = 16 + bh + 12
+
+    # Prompt (centered, quoted, big, word-wrapped to column width).
+    prompt_font = _load_font(34)
+    quoted = f"\u201c{prompt}\u201d"
+    words = quoted.split()
+    lines: list[str] = []
+    current = ""
+    for w in words:
+        candidate = (current + " " + w).strip()
+        if draw.textbbox((0, 0), candidate, font=prompt_font)[2] > col_w and current:
+            lines.append(current)
+            current = w
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    line_h = draw.textbbox((0, 0), "Ag", font=prompt_font)[3] + 6
+    for line in lines:
+        lw = draw.textbbox((0, 0), line, font=prompt_font)[2]
+        draw.text(((canvas_w - lw) // 2, y), line,
+                  fill="#5c4400", font=prompt_font)
+        y += line_h
+    y += 10
+
+    # Footer note pinned to the bottom.
+    note_text = "Full technical spec + report in the run trace."
+    note_font = _load_font(22)
+    nw, nh = draw.textbbox((0, 0), note_text, font=note_font)[2:]
+    note_y = canvas_h - margin_v - nh
+
+    # Rendered image fills the centered column, full available height.
+    img_top = y
+    img_bottom = note_y - 24
+    img_box_w = col_w
+    img_box_h = img_bottom - img_top
+    if image_path.exists() and img_box_h > 50:
+        img = Image.open(image_path).convert("RGB")
+        # Scale up if needed (PIL.thumbnail only shrinks).
+        scale = min(img_box_w / img.width, img_box_h / img.height)
+        new_size = (max(1, int(img.width * scale)),
+                    max(1, int(img.height * scale)))
+        img = img.resize(new_size, Image.LANCZOS)
+        ix = (canvas_w - img.width) // 2
+        iy = img_top + (img_box_h - img.height) // 2
+        bg.paste(img, (ix, iy))
+    elif not image_path.exists():
+        miss_font = _load_font(28)
+        draw.text((col_x, img_top + 20),
+                  f"(missing: {image_path.name})",
+                  fill="#888888", font=miss_font)
+
+    draw.text(((canvas_w - nw) // 2, note_y), note_text,
+              fill="#888888", font=note_font)
+
+    return bg
 
 # ---------------------------------------------------------------------------
 # Per-frame state. Each frame is a *delta* applied to a cumulative state.
@@ -133,8 +240,8 @@ def render_dot(state: dict) -> str:
         '  rankdir=LR; bgcolor="white"; pad=0.4;',
         '  nodesep=0.35; ranksep=0.7; fontname="Helvetica"; compound=true;',
         '  node [shape=box style="rounded,filled" fontname="Helvetica" '
-        '       fontsize=11 margin="0.14,0.08"];',
-        f'  edge [color="{EDGE_BLUE}" fontsize=9 fontname="Helvetica"];',
+        '       fontsize=22 margin="0.22,0.14"];',
+        f'  edge [color="{EDGE_BLUE}" fontsize=16 fontname="Helvetica"];',
         label_attr,
     ]
 
@@ -300,15 +407,6 @@ def build_frames() -> list[dict]:
     for _ in range(4):
         frames.append(dict(state))
 
-    # Prompt-swap showcase: same diagram, different user prompt.
-    # Demonstrates that the same pipeline works across domains.
-    snap(prompt="Design a bridge for<BR/>50 cars/h \u2014 modern",
-         banner="Same pipeline. Any domain.")
-    snap(prompt="Design a roller coaster<BR/>for 50 people \u2014 modern",
-         banner="Same pipeline. Any domain.")
-    snap(prompt="Design an airplane<BR/>for 200 people",
-         banner="Same pipeline. Any domain.")
-
     return frames
 
 
@@ -319,7 +417,7 @@ def render_frame(state: dict, out_path: Path) -> None:
     dot_file = out_path.with_suffix(".dot")
     dot_file.write_text(dot_src)
     subprocess.run(
-        ["dot", "-Tpng", "-Gdpi=110", str(dot_file), "-o", str(out_path)],
+        ["dot", "-Tpng", "-Gdpi=130", str(dot_file), "-o", str(out_path)],
         check=True,
     )
     dot_file.unlink()
@@ -332,11 +430,10 @@ def main() -> None:
     # Per-frame durations (seconds). Forward phase has variable timing so
     # the early "scaffold" frames are shorter than the team reveals.
     durations: list[float] = []
-    n_forward = len(frames_state) - 9  # last 3 = prompt swaps, 4 = hold, 2 = pulse
+    n_forward = len(frames_state) - 6  # last 4 = hold, 2 = pulse
     durations.extend([1.10] * n_forward)   # forward build: each step held ~1.1 s
     durations.extend([1.60] * 2)           # pulse frames: held longer for emphasis
     durations.extend([1.30] * 4)           # hold frames: full diagram visible
-    durations.extend([3.00] * 3)           # prompt-swap showcase: each held 3 s
 
     with TemporaryDirectory() as td:
         td_path = Path(td)
@@ -347,24 +444,38 @@ def main() -> None:
             png_paths.append(png)
             print(f"  frame {i+1}/{len(frames_state)}  ok")
 
-        # ----- Pad every frame to the same canvas size (=last frame) so
-        # GIF/MP4 don't jitter.
-        last = Image.open(png_paths[-1])
-        canvas_w, canvas_h = last.size
-        # libx264 requires even dimensions; round up.
-        if canvas_w % 2:
-            canvas_w += 1
-        if canvas_h % 2:
-            canvas_h += 1
+        # ----- Pad every frame to a fixed 16:9 canvas (1920x1080) so the
+        # output is Twitter/X-compatible. Each rendered diagram or result
+        # frame is scaled to fit and centered with white letterboxing.
+        canvas_w, canvas_h = 1920, 1080
+
+        def fit_to_canvas(src_path: Path) -> Image.Image:
+            src = Image.open(src_path).convert("RGB")
+            scale = min(canvas_w / src.width, canvas_h / src.height)
+            new_size = (max(1, int(src.width * scale)),
+                        max(1, int(src.height * scale)))
+            scaled = src.resize(new_size, Image.LANCZOS)
+            bg = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
+            bg.paste(scaled, ((canvas_w - scaled.width) // 2,
+                              (canvas_h - scaled.height) // 2))
+            return bg
+
         padded_paths: list[Path] = []
         for i, p in enumerate(png_paths):
-            img = Image.open(p).convert("RGBA")
-            bg = Image.new("RGBA", (canvas_w, canvas_h), (255, 255, 255, 255))
-            bg.paste(img, ((canvas_w - img.width) // 2,
-                           (canvas_h - img.height) // 2), img)
             out = td_path / f"padded_{i:03d}.png"
-            bg.convert("RGB").save(out)
+            fit_to_canvas(p).save(out)
             padded_paths.append(out)
+
+        # ----- Result frames: prompt + actual rendered output for each domain.
+        # Composed directly on the 1920x1080 canvas.
+        for j, (prompt, img_path, banner) in enumerate(RESULT_FRAMES):
+            frame = compose_result_frame(prompt, img_path, banner,
+                                         canvas_w, canvas_h)
+            out = td_path / f"result_{j:03d}.png"
+            frame.save(out)
+            padded_paths.append(out)
+            durations.append(3.50)
+            print(f"  result frame {j+1}/{len(RESULT_FRAMES)}  ok ({img_path.name})")
 
         # ----- Build GIF via PIL directly (imageio's GIF plugin silently
         # ignores per-frame duration lists in some versions). PIL accepts
@@ -385,14 +496,17 @@ def main() -> None:
         total_s = sum(durations_ms) / 1000
         print(f"[methodology-anim] wrote {gif_path}  ({size_kb} KB), ~{total_s:.1f}s")
 
-        # ----- Build MP4 via imageio-ffmpeg. Use a constant base fps
-        # and duplicate frames per their per-frame duration to honour
-        # variable timing (poor man's concat demuxer).
-        base_fps = 4  # 0.25 s resolution
+        # ----- Build MP4 via imageio-ffmpeg. Use a 30 fps base (Twitter
+        # rejects ultra-low frame-rate clips) and duplicate frames per
+        # their per-frame duration. Output yuv420p so it plays in every
+        # browser/social-media client.
+        base_fps = 30
         mp4_path = OUT_DIR / "VID-2-methodology.mp4"
         writer = imageio.get_writer(
             mp4_path, fps=base_fps, codec="libx264",
             quality=8, macro_block_size=None,
+            ffmpeg_params=["-pix_fmt", "yuv420p", "-profile:v", "high",
+                           "-level", "4.0"],
         )
         for p, d in zip(padded_paths, durations):
             img = imageio.imread(p)

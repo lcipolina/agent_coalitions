@@ -132,7 +132,7 @@ DEMO_PROMPT_LABELS: dict[str, str] = {
 
 STAGES = [
     ("decompose", "1️⃣  Decompose"),
-    ("execute", "2️⃣  Teams & agent comms"),
+    ("execute", "2️⃣  Teams & council"),
     ("synthesise", "3️⃣  Synthesise spec"),
     ("validate", "4️⃣  Validate"),
     ("estimate", "5️⃣  Cost"),
@@ -485,7 +485,7 @@ if metrics:
     tab_report, tab_reput, tab_workflow, tab_mongo,
 ) = st.tabs([
     "\U0001f4d6 Methodology",
-    "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Agent comms", "\u2705 Validation",
+    "\U0001f333 DAG", "\U0001f465 Teams", "\U0001f4ac Council", "\u2705 Validation",
     "\U0001f3a8 Rendering",
     "\U0001f4c4 Report", "\U0001f4c8 Reputation",
     "\U0001f578\ufe0f Workflow", "\U0001f343 MongoDB",
@@ -908,15 +908,14 @@ with tab_coal:
         )
 
 
-# ----- Agent comms ----------------------------------------------------------
+# ----- Council (multi-agent deliberation) -----------------------------------
 with tab_bb:
     st.caption(
-        "**Agentic forum.** This shows the agents' communication while "
-        "solving their subtask. The marshal (\U0001f9ed) starts off the "
-        "conversation and coordinates each round, the agents "
-        "(\U0001f916) contribute their domain expertise, and when the "
-        "team is done the marshal summarises the result back to the "
-        "orchestrator."
+        "**Council (multi-agent deliberation).** This shows the agents' "
+        "communication while solving their subtask. The marshal (\U0001f9ed) "
+        "starts off the conversation and coordinates each round; the agents "
+        "(\U0001f916) contribute their domain expertise; when the team is "
+        "done the marshal summarises the result back to the orchestrator."
     )
     msgs = list(
         db.coalition_messages.find({"run_id": run_id}, {"_id": 0})
@@ -1355,7 +1354,7 @@ digraph MongoDB {
   decomp  [label="Decomposer\\n(LLM)", fillcolor="#eaf3ff" color="#4a6fa5"];
   embed   [label="OpenAI\\nembeddings\\n(1536-d)", fillcolor="#eaf3ff" color="#4a6fa5"];
   match   [label="Skill matching\\n+ coverage floor\\n+ set-cover", fillcolor="#eaf3ff" color="#4a6fa5"];
-  bb      [label="Agent comms", fillcolor="#eaf3ff" color="#4a6fa5"];
+    bb      [label="Council", fillcolor="#eaf3ff" color="#4a6fa5"];
   synth   [label="Synthesise →\\nValidate →\\nCost → Report", fillcolor="#eaf3ff" color="#4a6fa5"];
   rep     [label="Shapley\\n+ reputation\\nupdate", fillcolor="#eaf3ff" color="#4a6fa5"];
 
@@ -1422,11 +1421,11 @@ digraph MongoDB {
         "pick the smallest team that covers all required capabilities. "
         "Agents are looked up from \u2461 the **catalog** (`agents` "
         "documents carry `skill_ids`).\n"
-        "5. **Agent comms.**  The selected team collaborates on a shared "
-        "log \u2014. Every message (marshal kickoff, "
+        "5. **Council (multi-agent deliberation).**  The selected team "
+        "collaborates on a shared log. Every message (marshal kickoff, "
         "agent contribution, reconcile) is appended to \u2462 the "
         "**team message bus** (`coalition_messages`), indexed by "
-        "`(run_id, subtask_id, ts)` so the Agent comms tab can replay it.\n"
+        "`(run_id, subtask_id, ts)` so the Council tab can replay it.\n"
         "6. **Synthesise \u2192 Validate \u2192 Cost \u2192 Report.**  The team's "
         "raw outputs are merged into a design spec, validated against "
         "engineering rules, costed, and rendered into a brief. Every "
