@@ -5,6 +5,18 @@ from src.agents.coalitions import CandidateSkill, coalition_value, form_coalitio
 
 
 def _mk(skill_id: str, cov: float, rep: float, installs: int, vec: list[float]):
+    """Helper to create a CandidateSkill for testing.
+
+    Args:
+        skill_id (str): Skill identifier.
+        cov (float): Coverage value.
+        rep (float): Reputation value.
+        installs (int): Weekly installs.
+        vec (list[float]): Embedding vector.
+
+    Returns:
+        CandidateSkill: Candidate skill instance.
+    """
     return CandidateSkill(
         skill_id=skill_id, name=skill_id, coverage=cov, prior_reputation=rep,
         weekly_installs=installs, embedding=np.asarray(vec, dtype=np.float32),
@@ -12,6 +24,7 @@ def _mk(skill_id: str, cov: float, rep: float, installs: int, vec: list[float]):
 
 
 def test_form_coalition_picks_highest_solo_first():
+    """Test that the coalition picks the highest solo value candidate first."""
     candidates = [
         _mk("a", 0.9, 0.9, 1000, [1, 0, 0]),
         _mk("b", 0.2, 0.2, 100, [0, 1, 0]),
@@ -21,6 +34,7 @@ def test_form_coalition_picks_highest_solo_first():
 
 
 def test_form_coalition_size_at_most_three():
+    """Test that the coalition size is at most three."""
     cands = [
         _mk(f"s{i}", 0.5, 0.5, 100, [1.0 if j == i else 0.0 for j in range(5)])
         for i in range(5)
@@ -30,6 +44,7 @@ def test_form_coalition_size_at_most_three():
 
 
 def test_complementarity_bonus_increases_value():
+    """Test that complementarity bonus increases coalition value for orthogonal skills."""
     a = _mk("a", 0.5, 0.5, 100, [1, 0, 0])
     b_orth = _mk("b", 0.5, 0.5, 100, [0, 1, 0])
     b_par = _mk("c", 0.5, 0.5, 100, [1, 0, 0])

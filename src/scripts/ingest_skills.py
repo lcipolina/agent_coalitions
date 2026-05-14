@@ -14,7 +14,16 @@ from src.db.seed import seed_agents, seed_skills
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point: ensure indexes, then seed skills + agents."""
+    """CLI entry point for seeding skills and agents.
+
+    Ensures all indexes exist, then seeds the skills and agents collections.
+
+    Args:
+        argv (list[str] | None, optional): Command-line arguments. Defaults to None.
+
+    Returns:
+        int: Exit code (0 for success).
+    """
     p = argparse.ArgumentParser()
     p.add_argument("--drop", action="store_true",
                    help="delete existing skills/agents before seeding")

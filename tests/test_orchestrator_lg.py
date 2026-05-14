@@ -31,6 +31,7 @@ REQUIRED_EVENT_KINDS = {
 
 
 def test_e2e_langgraph_pipeline():
+    """End-to-end test of the LangGraph pipeline in mock mode, checking G6 invariants and replay."""
     assert settings.use_mock_llm, "test must run with USE_MOCK_LLM=true"
     out = run_pipeline_lg("design a 2 km bridge for 50 cars/h with trucks")
     run_id = out["run_id"]
@@ -55,6 +56,7 @@ def test_e2e_langgraph_pipeline():
 
 
 def test_langgraph_graph_compiles():
+    """Test that the LangGraph graph builds and exposes the expected nodes."""
     """Smoke test: the graph builds and exposes the expected nodes."""
     from src.pipeline.orchestrator_lg import build_graph
 

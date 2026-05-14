@@ -11,7 +11,14 @@ from src.db.matching import search_skills
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run a single Atlas $vectorSearch query and print the top hits."""
+    """Run a single Atlas $vectorSearch query and print the top hits.
+
+    Args:
+        argv (list[str] | None, optional): Command-line arguments. Defaults to None.
+
+    Returns:
+        int: Exit code (0 for success, 2 if no hits).
+    """
     argv = argv if argv is not None else sys.argv[1:]
     query = argv[0] if argv else "structural steel design"
     hits = search_skills(query, limit=5)

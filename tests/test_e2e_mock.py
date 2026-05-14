@@ -23,6 +23,7 @@ REQUIRED_EVENT_KINDS = {
 
 
 def test_e2e_mock_pipeline():
+    """End-to-end test of the pipeline in mock mode, checking G6 invariants and event kinds."""
     assert settings.use_mock_llm, "test must run with USE_MOCK_LLM=true"
     out = run_pipeline("design a 2 km bridge for 50 cars/h with trucks")
     run_id = out["run_id"]

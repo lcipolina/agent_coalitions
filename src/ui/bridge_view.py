@@ -11,8 +11,6 @@ structure, soft shadow under the deck. The figure is purely indicative —
 proportions are exaggerated for legibility (vertical exaggeration ~3-4×).
 """
 from __future__ import annotations
-
-import math
 from typing import Any
 
 import numpy as np
@@ -108,6 +106,15 @@ def _add_deck(fig: go.Figure, x0: float, x1: float, y_deck: float,
 
 def _add_piers(fig: go.Figure, xs: list[float], y_deck: float,
                pier_width: float, total_length: float) -> None:
+    """Add piers to the bridge figure, including reflections.
+
+    Args:
+        fig (go.Figure): Plotly figure to add shapes to.
+        xs (list[float]): X positions of supports/piers.
+        y_deck (float): Y position of the deck.
+        pier_width (float): Width of each pier.
+        total_length (float): Total bridge length.
+    """
     for xp in xs:
         # taper piers slightly (top narrower)
         top_half = pier_width * 0.4
@@ -135,7 +142,17 @@ def _add_piers(fig: go.Figure, xs: list[float], y_deck: float,
 
 def _add_cable_stayed(fig: go.Figure, xs: list[float], y_deck: float,
                       total_length: float) -> tuple[float, float]:
-    """Place pylons on every other pier, fan cables to mid-spans."""
+    """Add cable-stayed pylons and cables to the figure.
+
+    Args:
+        fig (go.Figure): Plotly figure to add shapes to.
+        xs (list[float]): X positions of supports/piers.
+        y_deck (float): Y position of the deck.
+        total_length (float): Total bridge length.
+
+    Returns:
+        tuple[float, float]: (y position of pylon top, pylon height)
+    """
     n_supports = len(xs)
     if n_supports < 3:
         return y_deck, y_deck
@@ -193,6 +210,17 @@ def _add_cable_stayed(fig: go.Figure, xs: list[float], y_deck: float,
 
 def _add_suspension(fig: go.Figure, xs: list[float], y_deck: float,
                     total_length: float) -> float:
+    """Add suspension towers, main cable, and hangers to the figure.
+
+    Args:
+        fig (go.Figure): Plotly figure to add shapes to.
+        xs (list[float]): X positions of supports/piers.
+        y_deck (float): Y position of the deck.
+        total_length (float): Total bridge length.
+
+    Returns:
+        float: Y position of the main cable top.
+    """
     if len(xs) < 2:
         return y_deck
     # Two towers at ~25% and ~75% of length.
@@ -206,6 +234,19 @@ def _add_suspension(fig: go.Figure, xs: list[float], y_deck: float,
     # Parabolic main cable in three segments
     def parabola(x_a: float, y_a: float, x_b: float, y_b: float,
                  sag: float, n: int = 40):
+        """Generate a parabolic curve between two points with sag.
+
+        Args:
+            x_a (float): Start x.
+            y_a (float): Start y.
+            x_b (float): End x.
+            y_b (float): End y.
+            sag (float): Sag depth below straight line.
+            n (int): Number of points.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: X and Y coordinates of the parabola.
+        """
         xs_seg = np.linspace(x_a, x_b, n)
         # quadratic dipping by 'sag' below straight line
         ys_seg = np.linspace(y_a, y_b, n)
@@ -234,6 +275,17 @@ def _add_suspension(fig: go.Figure, xs: list[float], y_deck: float,
 
 def _add_arch(fig: go.Figure, xs: list[float], y_deck: float,
               total_length: float) -> float:
+    """Add an arch and spandrel verticals to the figure.
+
+    Args:
+        fig (go.Figure): Plotly figure to add shapes to.
+        xs (list[float]): X positions of supports/piers.
+        y_deck (float): Y position of the deck.
+        total_length (float): Total bridge length.
+
+    Returns:
+        float: Y position of the arch crown.
+    """
     if len(xs) < 2:
         return y_deck
     x0, x1 = xs[0], xs[-1]
@@ -258,6 +310,17 @@ def _add_arch(fig: go.Figure, xs: list[float], y_deck: float,
 
 def _add_truss(fig: go.Figure, xs: list[float], y_deck: float,
                deck_thickness: float) -> float:
+    """Add a truss structure above the deck to the figure.
+
+    Args:
+        fig (go.Figure): Plotly figure to add shapes to.
+        xs (list[float]): X positions of supports/piers.
+        y_deck (float): Y position of the deck.
+        deck_thickness (float): Thickness of the deck.
+
+    Returns:
+        float: Y position of the truss top.
+    """
     truss_h = max(deck_thickness * 4, 6)
     top_y = y_deck + deck_thickness + truss_h
     for i in range(len(xs) - 1):

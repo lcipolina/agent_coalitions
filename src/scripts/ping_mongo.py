@@ -14,7 +14,11 @@ from src.db.indexes import ensure_all
 
 
 def main() -> int:
-    """Ping Atlas, ensure all 13 collections + indexes exist, and report status."""
+    """Ping Atlas, ensure all 13 collections + indexes exist, and report status.
+
+    Returns:
+        int: Exit code (0 for success).
+    """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     db = get_db()
     # cheap round-trip

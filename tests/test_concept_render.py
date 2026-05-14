@@ -12,11 +12,13 @@ from src.pipeline.orchestrator import run_pipeline
 
 
 def test_llm_cache_collection_registered():
+    """Test that `llm_cache` is registered in COLLECTIONS and created by ensure_collections."""
     """`llm_cache` must be in COLLECTIONS so ensure_collections creates it."""
     assert "llm_cache" in COLLECTIONS
 
 
 def test_concept_render_mock_mode_produces_placeholder():
+    """Test that concept render in mock mode produces a placeholder SVG artifact and is idempotent."""
     assert settings.use_mock_llm, "test requires mock mode"
     out = run_pipeline("design a 1 km cable-stayed bridge for 60 cars/h")
     run_id = out["run_id"]
@@ -46,6 +48,7 @@ def test_concept_render_mock_mode_produces_placeholder():
 
 
 def test_build_image_prompt_is_deterministic_and_visual():
+    """Test that build_image_prompt is deterministic and includes key spec details."""
     spec = {
         "domain": "bridge",
         "bridge_type": "cable-stayed",

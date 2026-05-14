@@ -29,6 +29,14 @@ _BOX_K = [2, 3, 6, 7, 5, 4, 6, 7, 7, 4, 6, 5]
 
 
 def _box_trace(p: dict[str, Any]) -> go.Mesh3d:
+    """Create a Plotly Mesh3d trace for a box primitive.
+
+    Args:
+        p (dict[str, Any]): Primitive parameters with keys 'x', 'y', 'z', etc.
+
+    Returns:
+        go.Mesh3d: Plotly mesh trace for the box.
+    """
     x0, x1 = p["x"]
     y0, y1 = p["y"]
     z0, z1 = p["z"]
@@ -48,6 +56,14 @@ def _box_trace(p: dict[str, Any]) -> go.Mesh3d:
 
 
 def _line_trace(p: dict[str, Any]) -> go.Scatter3d:
+    """Create a Plotly Scatter3d trace for a polyline primitive.
+
+    Args:
+        p (dict[str, Any]): Primitive parameters with key 'points'.
+
+    Returns:
+        go.Scatter3d: Plotly line trace for the polyline.
+    """
     pts = p["points"]
     return go.Scatter3d(
         x=[q[0] for q in pts],
@@ -63,8 +79,16 @@ def _line_trace(p: dict[str, Any]) -> go.Scatter3d:
 
 
 def _mesh_trace(p: dict[str, Any]) -> go.Mesh3d:
-    """Generic triangle mesh. Expects ``x``, ``y``, ``z`` vertex lists
-    and ``i``, ``j``, ``k`` triangle index lists."""
+    """Create a Plotly Mesh3d trace for a generic triangle mesh.
+
+    Expects 'x', 'y', 'z' vertex lists and 'i', 'j', 'k' triangle index lists.
+
+    Args:
+        p (dict[str, Any]): Primitive parameters for the mesh.
+
+    Returns:
+        go.Mesh3d: Plotly mesh trace for the triangle mesh.
+    """
     return go.Mesh3d(
         x=p["x"], y=p["y"], z=p["z"],
         i=p["i"], j=p["j"], k=p["k"],
@@ -86,7 +110,14 @@ def _mesh_trace(p: dict[str, Any]) -> go.Mesh3d:
 
 
 def render_geometry(geometry: dict[str, Any]) -> go.Figure:
-    """Build a Plotly figure from a geometry artifact (boxes + polylines)."""
+    """Build a Plotly figure from a geometry artifact (boxes, lines, meshes).
+
+    Args:
+        geometry (dict[str, Any]): Geometry artifact with primitives.
+
+    Returns:
+        go.Figure: Plotly figure with all primitives rendered.
+    """
     fig = go.Figure()
     for prim in geometry.get("primitives", []):
         kind = prim.get("kind")
