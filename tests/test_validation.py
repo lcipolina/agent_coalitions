@@ -1,3 +1,14 @@
+"""
+Tests for deterministic validator checks.
+
+This module tests the core validation logic for bridge design specs, including lane geometry,
+live load, material span, span-to-depth ratio, support count, and overall status aggregation.
+
+How to run:
+    pytest tests/test_validation.py
+
+This test can be run standalone with pytest, or as part of the full test suite.
+"""
 """Tests for deterministic validator checks."""
 from src.pipeline.validation import (
     _check_lane_geometry, _check_live_load, _check_material_span,

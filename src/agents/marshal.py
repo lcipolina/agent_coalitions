@@ -1,3 +1,13 @@
+"""
+Marshal agent logic for Council protocol.
+
+Posts kickoff (round 0) and reconciles contributions (round 2) for each subtask.
+Used by the pipeline to coordinate agent teams and summarize contributions.
+
+How to use:
+    Imported and called by pipeline execution (not intended as a standalone script).
+    Not directly executable; invoked by pipeline logic for Council rounds.
+"""
 """Marshal: posts kickoff (round 0) and reconciles contributions (round 2)."""
 from __future__ import annotations
 

@@ -1,3 +1,14 @@
+"""
+Tests for coalitions.form_coalition.
+
+This module tests coalition formation logic, including candidate selection, coalition size,
+and complementarity bonus. It ensures the coalition logic is correct and robust.
+
+How to run:
+    pytest tests/test_coalitions.py
+
+This test can be run standalone with pytest, or as part of the full test suite.
+"""
 """Tests for coalitions.form_coalition."""
 import numpy as np
 

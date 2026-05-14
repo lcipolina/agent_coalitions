@@ -1,4 +1,16 @@
 """Token counting / truncation helpers using tiktoken (cl100k_base)."""
+"""
+Token counting / truncation helpers using tiktoken (cl100k_base).
+
+This module provides helpers for counting tokens and truncating text to a token limit,
+using the cl100k_base encoding (compatible with OpenAI models).
+
+How to use:
+    Import and call count_tokens(text) or truncate_to_tokens(text, max_tokens).
+    This module is used by pipeline and agent modules for token management.
+
+Not intended to be run as a standalone script.
+"""
 from __future__ import annotations
 
 from functools import lru_cache
