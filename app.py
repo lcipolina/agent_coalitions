@@ -162,6 +162,8 @@ STAGES = [
     ("reputation", "8️⃣  Reputation"),
 ]
 
+PLACEHOLDER_AGENT_TEXT = "applies my skills to the subtask"
+
 
 # ----------------------------------------------------------------------------
 # Agent display labels
@@ -263,6 +265,7 @@ with st.sidebar:
     # live mode, revert this block and remove the forced
     # ``USE_MOCK_LLM=true`` at the top of this file.
     settings.use_mock_llm = True
+    settings.strict_replay = True
 
     from src.llm import replay as _replay_info  # noqa: E402
 
@@ -273,8 +276,8 @@ with st.sidebar:
     else:
         st.warning(
             "🔒 Replay mode is on but no captured cache was found at "
-            "`data/llm_replay_cache.json`. Generic mock stubs will be "
-            "used. See `scripts/export_llm_cache.py` to capture a run.",
+            "`data/llm_replay_cache.json`. Runs will stop until the replay "
+            "cache is exported with `scripts/export_llm_cache.py`.",
             icon="⚠️",
         )
 
@@ -334,11 +337,18 @@ with st.sidebar:
         st.stop()
 
     db = get_db()
-    recent = list(
+    recent_candidates = list(
         db.runs.find({}, {"_id": 0, "run_id": 1, "prompt": 1, "status": 1,
                           "summary_metrics": 1})
-        .sort("started_at", -1).limit(5)
+        .sort("started_at", -1).limit(20)
     )
+    recent = [
+        r for r in recent_candidates
+        if db.coalition_messages.count_documents({
+            "run_id": r["run_id"],
+            "text": {"$regex": PLACEHOLDER_AGENT_TEXT},
+        }) == 0
+    ][:5]
     for r in recent:
         label = f"`{r['run_id']}` \u2014 {r.get('status', '?')}"
         if st.button(label, key=f"hist_{r['run_id']}", use_container_width=True):
@@ -1064,6 +1074,13 @@ with tab_bb:
     )
     if not msgs:
         st.info("No messages yet.")
+    elif any(PLACEHOLDER_AGENT_TEXT in str(m.get("text", "")) for m in msgs):
+        st.error(
+            "This saved run was produced by an old fallback path and contains "
+            "mock placeholder Council messages. It is hidden to avoid showing "
+            "incorrect agent communication. Click **Run pipeline** to create a "
+            "strict replay run from the recorded LLM cache."
+        )
     else:
         last_st = None
         for m in msgs:
