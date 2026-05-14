@@ -8,7 +8,6 @@ How to use:
     Imported and called by pipeline execution (not intended as a standalone script).
     Not directly executable; invoked by pipeline logic for Council rounds.
 """
-"""Marshal: posts kickoff (round 0) and reconciles contributions (round 2)."""
 from __future__ import annotations
 
 from src.agents.agent_comms import post, read
